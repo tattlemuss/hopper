@@ -684,6 +684,26 @@ int Inst_moveq(buffer_reader& buffer, instruction& inst, uint32_t header)
     return 0;
 }
 
+int Inst_subq(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+    uint16_t size = (header >> 6) & 3;
+    uint16_t mode = (header >> 3) & 7;
+    uint16_t reg  = (header >> 0) & 7;
+
+    uint16_t data = (header >> 9) & 7;
+    if (data == 0)
+        data = 8;
+    set_imm_byte(inst.op0, data);
+
+    Size sizes[] = { Size::BYTE, Size::WORD, Size::LONG, Size::NONE };
+    Size ea_size = sizes[size];
+    if (ea_size == Size::NONE)
+        return 1;
+
+    inst.suffix = size_to_suffix(ea_size);
+    return read_ea(buffer, inst.op1, ALT, mode, reg, ea_size);
+}
+
 // ----------------------------------------------------------------------------
 int Inst_trap(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
@@ -1189,10 +1209,8 @@ matcher_entry g_matcher_table[] =
 	MATCH_ENTRY1_IMPL(6, 10, 0b0101111011     ,    false, "sgt",                Inst_scc ),
 	MATCH_ENTRY1_IMPL(6, 10, 0b0101111111     ,    false, "sle",                Inst_scc ),
 
-
-	MATCH_ENTRY2(12, 4, 0b0101, 6, 2, 0b11         ,    false, "s",                 Inst_scc ),
-	MATCH_ENTRY2(12, 4, 0b0101, 8, 1, 0b1          ,    false, "subq",              Inst_subq ),
-	MATCH_ENTRY2(12, 4, 0b0101, 8, 1, 0b0          ,    false, "addq",              Inst_subq ),
+	MATCH_ENTRY2_IMPL(12, 4, 0b0101, 8, 1, 0b1          ,    false, "subq",              Inst_subq ),
+	MATCH_ENTRY2_IMPL(12, 4, 0b0101, 8, 1, 0b0          ,    false, "addq",              Inst_subq ),
 
 	MATCH_ENTRY2_IMPL(12, 4, 0b0111, 8, 1, 0b0     ,    false, "moveq",             Inst_moveq ),
 
