@@ -673,7 +673,7 @@ int Inst_movea(buffer_reader& buffer, instruction& inst, uint32_t header)
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
 
-	Size sizes[] = { Size::NONE, Size::LONG, Size::WORD, Size::NONE };
+	Size sizes[] = { Size::NONE, Size::NONE, Size::LONG, Size::WORD };
 	Size ea_size = sizes[size];
 	if (ea_size == Size::NONE)
 		return 1;
