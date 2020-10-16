@@ -222,6 +222,7 @@ struct instruction
 	operand		op1;
 };
 
+// Set functions to correctly handle operand union data
 void set_imm_byte(operand& op, uint8_t val)
 {
     op.type = OpType::IMMEDIATE;
@@ -253,6 +254,18 @@ void set_areg(operand& op, uint16_t reg)
 {
     op.type = OpType::A_DIRECT;
     op.a_register.reg = reg;
+}
+
+void set_predec(operand& op, uint16_t reg)
+{
+    op.type = OpType::INDIRECT_PREDEC;
+    op.indirect_predec.reg = reg;
+}
+
+void set_postinc(operand& op, uint16_t reg)
+{
+    op.type = OpType::INDIRECT_POSTINC;
+    op.indirect_postinc.reg = reg;
 }
 
 // ----------------------------------------------------------------------------
@@ -1040,6 +1053,88 @@ int Inst_scc(buffer_reader& buffer, instruction& inst, uint32_t header)
     return read_ea(buffer, inst.op0, DATA_ALT, mode, reg, Size::BYTE);
 }
 
+int Inst_sbcd_reg(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+    uint16_t regx = (header >> 0) & 7;
+    uint16_t regy = (header >> 9) & 7;
+    set_dreg(inst.op0, regx);
+    set_dreg(inst.op1, regy);
+    return 0;
+}
+
+int Inst_sbcd_predec(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+    uint16_t regx = (header >> 0) & 7;
+    uint16_t regy = (header >> 9) & 7;
+    set_predec(inst.op0, regx);
+    set_predec(inst.op1, regy);
+    return 0;
+}
+
+int Inst_subx_reg(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+    uint16_t size = (header >> 6) & 3;
+    Size ea_size = standard_size_table[size];
+    if (ea_size == Size::NONE)
+        return 1;
+    inst.suffix = size_to_suffix(ea_size);
+    uint16_t regx = (header >> 0) & 7;
+    uint16_t regy = (header >> 9) & 7;
+    set_dreg(inst.op0, regx);
+    set_dreg(inst.op1, regy);
+    return 0;
+}
+
+int Inst_subx_predec(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+    uint16_t size = (header >> 6) & 3;
+    Size ea_size = standard_size_table[size];
+    if (ea_size == Size::NONE)
+        return 1;
+    inst.suffix = size_to_suffix(ea_size);
+
+    uint16_t regx = (header >> 0) & 7;
+    uint16_t regy = (header >> 9) & 7;
+    set_predec(inst.op0, regx);
+    set_predec(inst.op1, regy);
+    return 0;
+}
+
+int Inst_cmpm(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+    uint16_t size = (header >> 6) & 3;
+    Size ea_size = standard_size_table[size];
+    if (ea_size == Size::NONE)
+        return 1;
+    inst.suffix = size_to_suffix(ea_size);
+
+    uint16_t regx = (header >> 0) & 7;
+    uint16_t regy = (header >> 9) & 7;
+    set_postinc(inst.op0, regx);
+    set_postinc(inst.op1, regy);
+    return 0;
+}
+
+int Inst_cmpa(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+    uint16_t mode = (header >> 3) & 7;
+    uint16_t reg  = (header >> 0) & 7;
+    uint16_t size = (header >> 8) & 1;
+    uint16_t areg = (header >> 9) & 7;
+
+    Size ea_size = size ? Size::LONG : Size::WORD;
+    if (ea_size == Size::NONE)
+        return 1;
+    inst.suffix = size_to_suffix(ea_size);
+
+    if (read_ea(buffer, inst.op0, ALL, mode, reg, ea_size))
+        return 1;
+    set_areg(inst.op1, areg);
+    return 0;
+}
+
+
+// ----------------------------------------------------------------------------
 typedef int (*pfnDecoderFunc)(buffer_reader& buffer, instruction& inst, uint32_t header);
 
 // ===========================================================
@@ -1214,17 +1309,18 @@ matcher_entry g_matcher_table[] =
 
 	MATCH_ENTRY2_IMPL(12, 4, 0b0111, 8, 1, 0b0     ,    false, "moveq",             Inst_moveq ),
 
-	MATCH_ENTRY2(12, 4, 0b1000, 3, 6, 0b100000     ,    false, "sbcd",              Inst_sbcd_reg ),
-	MATCH_ENTRY2(12, 4, 0b1000, 3, 6, 0b100001     ,    false, "sbcd",              Inst_sbcd_predec ),
-	MATCH_ENTRY2(12, 4, 0b1100, 3, 6, 0b100000     ,    false, "abcd",              Inst_sbcd_reg ),
-	MATCH_ENTRY2(12, 4, 0b1100, 3, 6, 0b100001     ,    false, "abcd",              Inst_sbcd_predec ),
+	MATCH_ENTRY2_IMPL(12, 4, 0b1000, 3, 6, 0b100000     ,    false, "sbcd",              Inst_sbcd_reg ),
+	MATCH_ENTRY2_IMPL(12, 4, 0b1000, 3, 6, 0b100001     ,    false, "sbcd",              Inst_sbcd_predec ),
+	MATCH_ENTRY2_IMPL(12, 4, 0b1100, 3, 6, 0b100000     ,    false, "abcd",              Inst_sbcd_reg ),
+	MATCH_ENTRY2_IMPL(12, 4, 0b1100, 3, 6, 0b100001     ,    false, "abcd",              Inst_sbcd_predec ),
 
-	MATCH_ENTRY3(12, 4, 0b1001, 8, 1, 1, 3, 3, 0 ,    false, "subx",              Inst_subx_reg ),
-	MATCH_ENTRY3(12, 4, 0b1001, 8, 1, 1, 3, 3, 1 ,    false, "subx",              Inst_subx_predec ),
-	MATCH_ENTRY3(12, 4, 0b1101, 8, 1, 1, 3, 3, 0 ,    false, "addx",              Inst_subx_reg ),
-	MATCH_ENTRY3(12, 4, 0b1101, 8, 1, 1, 3, 3, 1 ,    false, "addx",              Inst_subx_predec ),
+	MATCH_ENTRY3_IMPL(12, 4, 0b1001, 8, 1, 1, 3, 3, 0 ,    false, "subx",              Inst_subx_reg ),
+	MATCH_ENTRY3_IMPL(12, 4, 0b1001, 8, 1, 1, 3, 3, 1 ,    false, "subx",              Inst_subx_predec ),
+	MATCH_ENTRY3_IMPL(12, 4, 0b1101, 8, 1, 1, 3, 3, 0 ,    false, "addx",              Inst_subx_reg ),
+	MATCH_ENTRY3_IMPL(12, 4, 0b1101, 8, 1, 1, 3, 3, 1 ,    false, "addx",              Inst_subx_predec ),
 
-	MATCH_ENTRY3(12, 4, 0b1011, 8, 1, 1, 3, 3, 1 ,    false, "cmpm",              Inst_cmpm ),
+	MATCH_ENTRY3_IMPL(12, 4, 0b1011, 8,1,1, 3,3,1 ,        false, "cmpm",              Inst_cmpm ),
+	MATCH_ENTRY2_IMPL(12, 4, 0b1011, 6,2,3,                false, "cmpa",              Inst_cmpa ),
 
 	// Nasty case where eor and cmp mirror one another
 	MATCH_ENTRY2(12, 4, 0b1011, 6, 3, 0b100        ,    false, "eor",               Inst_eor ),
