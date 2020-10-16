@@ -4,6 +4,7 @@
 #include <memory.h>
 #include <assert.h>
 #include <vector>
+#include <string>
 
 // ----------------------------------------------------------------------------
 class buffer_reader
@@ -47,6 +48,16 @@ public:
 		return 0;
 	}
 
+	// Copy bytes into the buffer
+	int read(uint8_t* data, int count)
+	{
+		if (m_pos + count > m_length)
+			return 1;
+		for (int i = 0; i < count; ++i)
+			*data++ = m_pData[m_pos++];
+		return 0;
+	}
+
 	void advance(uint32_t count)
 	{
 		m_pos += count;
@@ -75,6 +86,49 @@ private:
 	uint32_t		m_pos;
 };
 
+// ----------------------------------------------------------------------------
+//	SYMBOL STORAGE
+// ----------------------------------------------------------------------------
+struct symbol
+{
+	enum section_type
+	{
+		TEXT,
+		DATA,
+		BSS,
+		UNKNOWN			// placeholder for unexpected symbols
+	};
+
+	std::string		label;
+	section_type	section;
+	// TODO section, flags.
+	uint32_t		address;	
+};
+
+class symbols
+{
+public:
+	std::vector<symbol>		table;
+};
+
+bool find_symbol(const symbols& symbols, symbol::section_type section, uint32_t address, symbol& result)
+{
+	for (size_t i = 0; i < symbols.table.size(); ++i)
+	{
+		const symbol& sym = symbols.table[i];
+		if (sym.section == section &&
+			sym.address == address)
+		{
+			result = sym;
+			return true;
+		}
+	}
+	return false;
+}
+
+// ----------------------------------------------------------------------------
+//	INSTRUCTION STORAGE
+// ----------------------------------------------------------------------------
 enum class Size
 {
 	BYTE,
@@ -225,6 +279,9 @@ struct instruction
 	operand		op1;
 };
 
+// ----------------------------------------------------------------------------
+//	INSTRUCTION DECODE
+// ----------------------------------------------------------------------------
 // Set functions to correctly handle operand union data
 void set_imm_byte(operand& op, uint8_t val)
 {
@@ -271,9 +328,6 @@ void set_postinc(operand& op, uint8_t reg)
 	op.indirect_postinc.reg = reg;
 }
 
-// ----------------------------------------------------------------------------
-//	PARSER CODE
-// ----------------------------------------------------------------------------
 // Effective Address modes
 enum ea_group
 {
@@ -338,53 +392,6 @@ OpType raw_bits_to_operand_type(uint8_t mode_bits, uint8_t reg_bits)
 
 	return OpType::kNone;
 }
-
-#if 0
-	def __init__(self, eatype, mode, reg, size, reader):
-		self.mode = self.raw_bits_to_ea_mode(mode, reg)
-		self.final_address = None
-		if self.mode == None:
-			raise ParseException('unknown EA')
-
-		# Check EA type is valid for this instruction
-		if self.mode_availability{self.mode][eatype] == false:
-			raise ParseException('invalid EA')
-
-		elif self.mode == self.PC_DISP_INDEX:
-			base_pc = reader.pc
-			disp = reader.read(2)
-			(disp, dreg, indsize) = self.decode_brief_extension_word(disp)
-			self.final_address = disp + base_pc
-			sym = reader.ctx.get_symbol(disp + base_pc)
-			if sym != None:
-				self.token = '%s(pc,d%u.%s)' % (sym, dreg, indsize)
-			else:
-				self.token = '$%x(pc,d%u.%s)' % (disp + base_pc, dreg, indsize)
-		# Immediate. Number of bytes read will vary!
-		elif self.mode == self.IMMEDIATE:
-			if size == ea.LONG:
-				imm = reader.read(4)
-			elif size == ea.WORD:
-				imm = reader.read(2)
-			elif size == ea.BYTE:
-				imm = reader.read(2) & 0xff
-			else:
-				# Should never get passed in
-				assert "Wrong size"
-			self.token = '#$%x' % imm
-		else:
-			# Corrupt
-			raise ParseException
-
-	def decode_brief_extension_word(self, word):
-		disp = extend_s8(word & 0x7f)
-		reg = (header >> 12) & 7
-		# Check .w/.l bit
-		sizes = ['w', 'l']
-		size = sizes[((header >> 11) & 1)]
-		return (disp, reg, size)
-
-#endif
 
 // ----------------------------------------------------------------------------
 // Split 16 bit raw displacement into signed 8-bit offset, register index and size
@@ -1664,10 +1671,97 @@ int decode(buffer_reader& buffer, instruction& inst)
 	return 1;
 }
 
+int decode_buf(buffer_reader& buf, const symbols& symbols)
+{
+	while (buf.get_remain() >= 2)
+	{
+		// TODO very naive label check
+		symbol sym;
+		if (find_symbol(symbols, symbol::section_type::TEXT, buf.get_pos(), sym))
+			printf("%s:\n", sym.label.c_str());
+
+		buffer_reader buf_copy2(buf);
+		uint16_t tmp = 0;
+		buf_copy2.read_word(tmp);
+		printf(">> %04x:   $%04x ", buf.get_pos(), tmp);
+		
+		buffer_reader buf_copy = buf;
+
+		instruction inst;
+		int res = decode(buf_copy, inst);
+
+		if (res == 0)
+			print(inst, stdout);
+		else
+			printf("dc.w $%x", inst.header);
+		printf("\n");
+		
+		// Move to next
+		buf.advance(inst.byte_count);
+	}
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
+//	DRI SYMBOL READING
+// ----------------------------------------------------------------------------
+static const int DRI_TABLE_SIZE = 14;
+static const uint16_t DRI_EXT_SYMBOL_FLAG = 0x0048;
+static const uint16_t DRI_SECT_TEXT = 0x0200;
+static const uint16_t DRI_SECT_DATA = 0x0400;
+static const uint16_t DRI_SECT_BSS  = 0x0100;
+
+int read_symbols(buffer_reader& buf, symbols& symbols)
+{
+	while (buf.get_remain() >= DRI_TABLE_SIZE)
+	{
+		uint8_t name[8 + 14 + 1];
+		uint16_t symbol_id;
+		uint32_t symbol_address;
+
+		// Name (8 bytes) -> ID (2 bytes) -> address (4 bytes)
+		memset(name, 0, sizeof(name));
+		if (buf.read(name, 8))
+			return 1;
+		if (buf.read_word(symbol_id))
+			return 1;
+		if (buf.read_long(symbol_address))
+			return 1;
+
+		// Looks like either bit denotes an extended symbol??
+		if ((symbol_id & DRI_EXT_SYMBOL_FLAG) != 0)
+		{
+			// 14 bytes: symbol name extended
+			if (buf.read(name + 8, 14))
+				return 1;
+		}
+
+		symbol sym;
+		sym.label = std::string((const char*)name);
+		sym.address = symbol_address;
+		sym.section = symbol::section_type::UNKNOWN;
+
+		// Parse the flags to work out which section
+		switch (symbol_id & 0xf00)
+		{
+			case DRI_SECT_TEXT: sym.section = symbol::section_type::TEXT; break;
+			case DRI_SECT_DATA: sym.section = symbol::section_type::DATA; break;
+			case DRI_SECT_BSS:  sym.section = symbol::section_type::BSS; break;
+			default:
+				break;
+		}
+		symbols.table.push_back(sym);
+	}
+
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
+//	TOS EXECUTABLE READING
 // ----------------------------------------------------------------------------
 struct tos_header
 {
-	   //  See http://toshyp.atari.org/en/005005.html for TOS header details
+   //  See http://toshyp.atari.org/en/005005.html for TOS header details
 	uint16_t  ph_branch;	  /* Branch to start of the program  */
 							  /* (must be 0x601a!)			   */
 
@@ -1710,29 +1804,23 @@ int process_tos_file(const uint8_t* pData, long size)
 	// Next section is text
 	fprintf(stdout, "Reading text section\n");
 
-	while (buf.get_remain() >= 2)
-	{
-		buffer_reader buf_copy2(buf);
-		uint16_t tmp = 0;
-		buf_copy2.read_word(tmp);
-		printf(">> %04x:   $%04x ", buf.get_pos(), tmp);
-		
-		buffer_reader buf_copy = buf;
+	buffer_reader text_buf(buf.get_data(), header.ph_tlen);
+	
+	// Skip the text
+	buf.advance(header.ph_tlen);
+	buffer_reader data_buf(buf.get_data(), header.ph_dlen);
 
-		instruction inst;
-		int res = decode(buf_copy, inst);
+	// Skip the data
+	buf.advance(header.ph_dlen);
 
-		if (res == 0)
-			print(inst, stdout);
-		else
-			printf("??");
-		printf("\n");
-		
-		// Move to next
-		buf.advance(inst.byte_count);
-	}
+	// (No BSS in the file, so symbols should be next)
+	buffer_reader symbol_buf(buf.get_data(), header.ph_slen);
 
-	return 0;
+	symbols exe_symbols;
+
+	int ret = read_symbols(symbol_buf, exe_symbols);
+
+	return decode_buf(text_buf, exe_symbols);
 }
 
 // ----------------------------------------------------------------------------
