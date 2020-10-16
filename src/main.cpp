@@ -1137,17 +1137,55 @@ int Inst_cmp(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	uint8_t size = (header >> 8) & 1;
-	uint8_t areg = (header >> 9) & 7;
-
-	Size ea_size = size ? Size::LONG : Size::WORD;
+	uint8_t size = (header >> 6) & 3;
+	uint8_t dreg = (header >> 9) & 7;
+	Size ea_size = standard_size_table[size];
 	if (ea_size == Size::NONE)
 		return 1;
 	inst.suffix = size_to_suffix(ea_size);
 
 	if (read_ea(buffer, inst.op0, ALL, mode, reg, ea_size))
 		return 1;
-	set_areg(inst.op1, areg);
+	set_dreg(inst.op1, dreg);
+	return 0;
+}
+
+int Inst_eor(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+	uint8_t mode = (header >> 3) & 7;
+	uint8_t reg  = (header >> 0) & 7;
+	uint8_t size = (header >> 6) & 3;
+	uint8_t dreg = (header >> 9) & 7;
+	Size ea_size = standard_size_table[size];
+	if (ea_size == Size::NONE)
+		return 1;
+	inst.suffix = size_to_suffix(ea_size);
+
+	// src is d-reg
+	set_dreg(inst.op0, dreg);
+
+	// dest is EA
+	if (read_ea(buffer, inst.op1, DATA_ALT, mode, reg, ea_size))
+		return 1;
+	return 0;
+}
+
+int Inst_mul(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+	uint8_t mode = (header >> 3) & 7;
+	uint8_t reg  = (header >> 0) & 7;
+	uint8_t dreg = (header >> 9) & 7;
+	Size ea_size = Size::WORD;
+	if (ea_size == Size::NONE)
+		return 1;
+	inst.suffix = Suffix::WORD;
+
+	// src is EA
+	if (read_ea(buffer, inst.op0, DATA, mode, reg, ea_size))
+		return 1;
+
+	// dst is d-reg
+	set_dreg(inst.op1, dreg);
 	return 0;
 }
 
@@ -1340,12 +1378,11 @@ matcher_entry g_matcher_table[] =
 	MATCH_ENTRY2_IMPL(12, 4, 0b1011, 6,2,3,				false, "cmpa",			  Inst_cmpa ),
 
 	// Nasty case where eor and cmp mirror one another
-	MATCH_ENTRY2(12, 4, 0b1011, 6, 3, 0b100		,	false, "eor",			   Inst_eor ),
-	MATCH_ENTRY2(12, 4, 0b1011, 6, 3, 0b101		,	false, "eor",			   Inst_eor ),
-	MATCH_ENTRY2(12, 4, 0b1011, 6, 3, 0b110		,	false, "eor",			   Inst_eor ),
-
-	MATCH_ENTRY2(12, 4, 0b1100, 6, 3, 0b011		,	false, "mulu.w",			Inst_mul ),
-	MATCH_ENTRY2(12, 4, 0b1100, 6, 3, 0b111		,	false, "muls.w",			Inst_mul ),
+	MATCH_ENTRY2_IMPL(12, 4, 0b1011, 6, 3, 0b100		,	false, "eor",			   Inst_eor ),
+	MATCH_ENTRY2_IMPL(12, 4, 0b1011, 6, 3, 0b101		,	false, "eor",			   Inst_eor ),
+	MATCH_ENTRY2_IMPL(12, 4, 0b1011, 6, 3, 0b110		,	false, "eor",			   Inst_eor ),
+	MATCH_ENTRY2_IMPL(12, 4, 0b1100, 6, 3, 0b011		,	false, "mulu",			Inst_mul ),
+	MATCH_ENTRY2_IMPL(12, 4, 0b1100, 6, 3, 0b111		,	false, "muls",			Inst_mul ),
 
 	MATCH_ENTRY3_IMPL(12, 4, 0b1110, 3, 2, 0, 8, 1, 1 ,	false, "asl",			   Inst_shift_reg ),
 	MATCH_ENTRY3_IMPL(12, 4, 0b1110, 3, 2, 0, 8, 1, 0 ,	false, "asr",			   Inst_shift_reg ),
@@ -1369,7 +1406,7 @@ matcher_entry g_matcher_table[] =
 	MATCH_ENTRY2_IMPL(12, 4, 0b1101, 6, 2, 0b11   ,	false, "adda",				Inst_addsuba ),
 
 	// Fallback generics
-	MATCH_ENTRY1(12, 4, 0b1011					   ,	false, "cmp",			   Inst_cmp ),
+	MATCH_ENTRY1_IMPL(12, 4, 0b1011					   ,	false, "cmp",			   Inst_cmp ),
 	
 	// Following where src/dest is d-register 
 	MATCH_ENTRY1_IMPL(12, 4, 0b1000					   ,	false, "or",		   Inst_alu_dreg ),
