@@ -650,7 +650,8 @@ int Inst_move(buffer_reader& buffer, instruction& inst, uint32_t header)
 	uint8_t dst_reg  = (header >> 9) & 7;
 	uint8_t dst_mode = (header >> 6) & 7;
 
-	Size sizes[] = { Size::BYTE, Size::LONG, Size::WORD, Size::NONE };
+	// NOTE: this is non-standard
+	Size sizes[] = { Size::NONE, Size::BYTE, Size::LONG, Size::WORD };
 	Size ea_size = sizes[sizebits];
 	if (ea_size == Size::NONE)
 		return 1;
