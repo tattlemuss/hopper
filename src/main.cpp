@@ -140,7 +140,7 @@ enum class Size
 // Operand types
 enum OpType
 {
-	kNone = 0,
+	INVALID = 0,
 	D_DIRECT,			// Dn		 000 reg. number:Dn
 	A_DIRECT,			// An		 001 reg. number:An
 	INDIRECT,			// (An)	   010 reg. number:An
@@ -165,7 +165,7 @@ enum OpType
 struct operand
 {
 	operand() :
-		type(OpType::kNone)
+		type(OpType::INVALID)
 	{}
 
 	// The overall type of operand
@@ -328,18 +328,20 @@ void set_postinc(operand& op, uint8_t reg)
 	op.indirect_postinc.reg = reg;
 }
 
-// Effective Address modes
+// Effective Address encoding modes.
+// Different instructions have different sets of EAs which are allowable to be used
+// for each operand. This ID flags which ones are allowed.
 enum ea_group
 {
 	DATA_ALT		= 0,	// Data alterable (no A-reg, no PC-rel, no immedidate)
 	DATA			= 1,	// Data, non-alterable (source)
-	MEM_ALT		 = 2,	// Memory, alterable (no A-reg, no PC-rel, no immedidate)
-	MEM			 = 3,	// Memory, non-alterable (source)
-	CONTROL		 = 4,
-	CONTROL_MOVEM1  = 5,	// Movem to memory
-	CONTROL_MOVEM2  = 6,	// Movem to reg
-	ALT			 = 7,	// Alterable including A-reg
-	ALL			 = 8,	 // e.g. cmp
+	MEM_ALT			= 2,	// Memory, alterable (no A-reg, no PC-rel, no immedidate)
+	MEM				= 3,	// Memory, non-alterable (source)
+	CONTROL			= 4,
+	CONTROL_MOVEM1	= 5,	// Movem to memory
+	CONTROL_MOVEM2	= 6,	// Movem to reg
+	ALT				= 7,	// Alterable including A-reg
+	ALL				= 8,	// e.g. cmp
 	COUNT
 };
 
@@ -347,50 +349,34 @@ enum ea_group
 bool mode_availability[][ea_group::COUNT] = 
 {
 	// DataAlt Data	 MemAlt   Mem	  Con	  ConMovem CMovem2  Alt	 All
-	{ true,	true,	false,   false,   false,   false,   false,   true,   true	}, // D_DIRECT			000 regno
-	{ false,   false,   false,   false,   false,   false,   false,   true,   true	}, // A_DIRECT			001 regno
-	{ true,	true,	true,	true,	true,	true,	true,	true,   true	}, // INDIRECT			010 regno
-	{ true,	true,	true,	true,	false,   false,   true,	true,   true	}, // INDIRECT_POSTINC	011 regno
-	{ true,	true,	true,	true,	false,   true,	true,	true,   true	}, // INDIRECT_PREDEC	 100 regno
-	{ true,	true,	true,	true,	true,	true,	true,	true,   true	}, // INDIRECT_DISP	   101 regno
-	{ true,	true,	true,	true,	true,	true,	true,	true,   true	}, // INDIRECT_INDEX,	 110 regno
-	{ true,	true,	true,	true,	true,	true,	true,	true,   true	}, // ABSOLUTE_WORD	   111 000
-	{ true,	true,	true,	true,	true,	true,	true,	true,   true	}, // ABSOLUTE_LONG	   111 001  // There is a typo in the doc here
-	{ false,   true,	false,   true,	true,	true,	true,	false,  true	}, // PC_DISP			 111 010
-	{ false,   true,	false,   true,	true,	true,	true,	false,  true	}, // PC_DISP_INDEX	   111 011
-	{ false,   true,	false,   true,	false,   false,   false,   false,  true	}, // IMMEDIATE		   111 100
+	{ true,	    true,	false,   false,   false,   false,   false,   true,   true	}, // D_DIRECT			000 regno
+	{ false,    false,  false,   false,   false,   false,   false,   true,   true	}, // A_DIRECT			001 regno
+	{ true,     true,	true,	true,	true,	true,	true,	true,   true	}, // INDIRECT			010 regno
+	{ true,     true,	true,	true,	false,   false,   true,	true,   true	}, // INDIRECT_POSTINC	011 regno
+	{ true,     true,	true,	true,	false,   true,	true,	true,   true	}, // INDIRECT_PREDEC	 100 regno
+	{ true,     true,	true,	true,	true,	true,	true,	true,   true	}, // INDIRECT_DISP	   101 regno
+	{ true,     true,	true,	true,	true,	true,	true,	true,   true	}, // INDIRECT_INDEX,	 110 regno
+	{ true,     true,	true,	true,	true,	true,	true,	true,   true	}, // ABSOLUTE_WORD	   111 000
+	{ true,     true,	true,	true,	true,	true,	true,	true,   true	}, // ABSOLUTE_LONG	   111 001  // There is a typo in the doc here
+	{ false,    true,	false,   true,	true,	true,	true,	false,  true	}, // PC_DISP			 111 010
+	{ false,    true,	false,   true,	true,	true,	true,	false,  true	}, // PC_DISP_INDEX	   111 011
+	{ false,    true,	false,   true,	false,   false,   false,   false,  true	    }, // IMMEDIATE		   111 100
+	{ false,    false,	false,   false,	false,   false,   false,   false,  false	}, // INVALID		   111 100
 };
 
 // There is a consistent approach to decoding the mode bits (0-6),
 // and when the mode is 7, using the register bits
-OpType raw_bits_to_operand_type(uint8_t mode_bits, uint8_t reg_bits)
+// Convert these mixed bits to a range [0-12)
+uint8_t decode_operand_type(uint8_t mode_bits, uint8_t reg_bits)
 {
-	static const OpType types0_6[] =
-	{
-		D_DIRECT,			// Dn		 000 reg. number:Dn
-		A_DIRECT,			// An		 001 reg. number:An
-		INDIRECT,			// (An)	   010 reg. number:An
-		INDIRECT_POSTINC,	// (An) +	 011 reg. number:An
-		INDIRECT_PREDEC,	 // – (An)	 100 reg. number:An
-		INDIRECT_DISP,	   // (d16,An)   101 reg. number:An
-		INDIRECT_INDEX,	  // (d8,An,Xn) 110 reg. number:An
-	};
-	static const OpType regtypes0_4[] =
-	{
-		ABSOLUTE_WORD,	   // (xxx).W	111 000
-		ABSOLUTE_LONG,	   // (xxx).L	111 001
-		PC_DISP,			 // (d16,PC)   111 010
-		PC_DISP_INDEX,	   // (d8,PC,Xn) 111 011
-		IMMEDIATE,		   // <data>	 111 100
-	};
-
 	if (mode_bits < 7)
-		return types0_6[mode_bits];
+		return mode_bits;
 	
 	if (reg_bits <= 4)
-		return regtypes0_4[reg_bits];
+		return  7 + reg_bits;
 
-	return OpType::kNone;
+	// Invalid!
+	return 7 + 5;
 }
 
 // ----------------------------------------------------------------------------
@@ -439,13 +425,38 @@ int read_immediate(buffer_reader& buffer, operand& operand, Size size)
 }
 
 // ----------------------------------------------------------------------------
-int read_ea(buffer_reader& buffer, operand& operand, ea_group group, uint8_t mode_bits, uint8_t reg_bits, Size size)
+int decode_ea(buffer_reader& buffer, operand& operand, ea_group group, uint8_t mode_bits, uint8_t reg_bits, Size size)
 {
 	// Convert to an operand type
-	operand.type = raw_bits_to_operand_type(mode_bits, reg_bits);
+	int ea_type = decode_operand_type(mode_bits, reg_bits);
+
 	// TODO Check EA type is valid for this instruction
 	//if self.mode_availability{self.mode][eatype] == false:
 	//		raise ParseException('invalid EA')
+
+	static const OpType types[] =
+	{
+		// 0-6 in "mode" bits
+		//                                mode
+		D_DIRECT,			// Dn		  000 reg. number:Dn
+		A_DIRECT,			// An		  001 reg. number:An
+		INDIRECT,			// (An)	      010 reg. number:An
+		INDIRECT_POSTINC,	// (An) +	  011 reg. number:An
+		INDIRECT_PREDEC,	// – (An)	  100 reg. number:An
+		INDIRECT_DISP,	    // (d16,An)   101 reg. number:An
+		INDIRECT_INDEX,	    // (d8,An,Xn) 110 reg. number:An
+
+        // 7 in "mode" bits, 0-4 in reg bits
+        //                                  mode reg
+		ABSOLUTE_WORD,      // (xxx).W      111 000
+		ABSOLUTE_LONG,      // (xxx).L      111 001
+		PC_DISP,		    // (d16,PC)     111 010
+		PC_DISP_INDEX,      // (d8,PC,Xn)   111 011
+		IMMEDIATE,          // <data>       111 100
+        INVALID,
+	};
+    assert(ea_type <= 7 + 4 + 1);
+    operand.type = types[ea_type];
 
 	uint16_t val16;
 	uint32_t val32;
@@ -527,14 +538,17 @@ int read_ea(buffer_reader& buffer, operand& operand, ea_group group, uint8_t mod
 }
 
 // ----------------------------------------------------------------------------
+// Mapping of 2-bits for size encodings in most instruction types that allow
+// all 3 sizes.
 Size standard_size_table[] =
 {
 	Size::BYTE,
 	Size::WORD,
 	Size::LONG,
-	Size::NONE
+	Size::NONE		// Either invalid, or used for another instruction type
 };
 
+// ----------------------------------------------------------------------------
 Suffix size_to_suffix(Size size)
 {
 	switch (size)
@@ -564,7 +578,7 @@ int Inst_integer_imm_ea(buffer_reader& buffer, instruction& inst, uint32_t heade
 	// op1: EA
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return read_ea(buffer, inst.op1, DATA_ALT, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op1, DATA_ALT, mode, reg, ea_size);
 }
 
 // ----------------------------------------------------------------------------
@@ -581,10 +595,10 @@ int Inst_size_ea(buffer_reader& buffer, instruction& inst, uint32_t header)
 	if (ea_size == Size::NONE)
 		return 1;
 
-	return read_ea(buffer, inst.op0, DATA_ALT, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op0, DATA_ALT, mode, reg, ea_size);
 }
 
-// Single EA operand
+// ----------------------------------------------------------------------------
 int Inst_lea(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t size = (header >> 6) & 3;
@@ -597,9 +611,10 @@ int Inst_lea(buffer_reader& buffer, instruction& inst, uint32_t header)
 	inst.op1.a_register.reg = dest_reg;
 
 	inst.suffix = Suffix::LONG;
-	return read_ea(buffer, inst.op0, CONTROL, mode, reg, Size::LONG);
+	return decode_ea(buffer, inst.op0, CONTROL, mode, reg, Size::LONG);
 }
 
+// ----------------------------------------------------------------------------
 int Inst_movem_reg_mem(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
@@ -614,7 +629,7 @@ int Inst_movem_reg_mem(buffer_reader& buffer, instruction& inst, uint32_t header
 	// src register
 	inst.op0.type = OpType::MOVEM_REG;
 	inst.op0.movem_reg.reg_mask = reg_mask;
-	if (read_ea(buffer, inst.op1, CONTROL_MOVEM1, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op1, CONTROL_MOVEM1, mode, reg, ea_size))
 		return 1;
 
 	// Special case: if we are -(a0) mode, order of registers is reversed
@@ -646,7 +661,7 @@ int Inst_movem_mem_reg(buffer_reader& buffer, instruction& inst, uint32_t header
 	// dst register
 	inst.op1.type = OpType::MOVEM_REG;
 	inst.op1.movem_reg.reg_mask = reg_mask;
-	return read_ea(buffer, inst.op0, CONTROL_MOVEM1, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op0, CONTROL_MOVEM1, mode, reg, ea_size);
 }
 
 // ----------------------------------------------------------------------------
@@ -666,10 +681,10 @@ int Inst_move(buffer_reader& buffer, instruction& inst, uint32_t header)
 	inst.suffix = size_to_suffix(ea_size);
 
 	// Src data comes first in the encoding
-	int ret = read_ea(buffer, inst.op0, ea_group::ALL, src_mode, src_reg, ea_size);
+	int ret = decode_ea(buffer, inst.op0, ea_group::ALL, src_mode, src_reg, ea_size);
 	if (ret != 0)
 		return ret;
-	ret = read_ea(buffer, inst.op1, ea_group::DATA_ALT, dst_mode, dst_reg, ea_size);
+	ret = decode_ea(buffer, inst.op1, ea_group::DATA_ALT, dst_mode, dst_reg, ea_size);
 	return ret;
 }
 
@@ -687,7 +702,7 @@ int Inst_movea(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 	inst.suffix = size_to_suffix(ea_size);
 
-	if (read_ea(buffer, inst.op0, ALL, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op0, ALL, mode, reg, ea_size))
 		return 1;
 
 	inst.op1.type = OpType::A_DIRECT;
@@ -706,6 +721,7 @@ int Inst_moveq(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_subq(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t size = (header >> 6) & 3;
@@ -723,7 +739,7 @@ int Inst_subq(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 
 	inst.suffix = size_to_suffix(ea_size);
-	return read_ea(buffer, inst.op1, ALT, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op1, ALT, mode, reg, ea_size);
 }
 
 // ----------------------------------------------------------------------------
@@ -741,7 +757,7 @@ int Inst_move_from_sr(buffer_reader& buffer, instruction& inst, uint32_t header)
 
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return read_ea(buffer, inst.op1, DATA, mode, reg, Size::WORD);
+	return decode_ea(buffer, inst.op1, DATA, mode, reg, Size::WORD);
 }
 
 // ----------------------------------------------------------------------------
@@ -752,7 +768,7 @@ int Inst_move_to_sr(buffer_reader& buffer, instruction& inst, uint32_t header)
 
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return read_ea(buffer, inst.op0, DATA, mode, reg, Size::WORD);
+	return decode_ea(buffer, inst.op0, DATA, mode, reg, Size::WORD);
 }
 
 // ----------------------------------------------------------------------------
@@ -770,7 +786,7 @@ int Inst_bchg_imm(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 
 	set_imm_byte(inst.op0, (imm >> 0) & 0xff);
-	if (read_ea(buffer, inst.op1, DATA_ALT, mode, reg, Size::NONE))
+	if (decode_ea(buffer, inst.op1, DATA_ALT, mode, reg, Size::NONE))
 		return 1;
 
 	// instruction size is LONG when using DREG.
@@ -787,7 +803,7 @@ int Inst_bchg(buffer_reader& buffer, instruction& inst, uint32_t header)
 	uint8_t reg  = (header >> 0) & 7;
 
 	set_dreg(inst.op0, bitreg);
-	read_ea(buffer, inst.op1, DATA_ALT, mode, reg, Size::BYTE);
+	decode_ea(buffer, inst.op1, DATA_ALT, mode, reg, Size::BYTE);
 	return 0;
 }
 
@@ -811,14 +827,14 @@ int Inst_alu_dreg(buffer_reader& buffer, instruction& inst, uint32_t header)
 		// Src is d-reg
 		inst.op0.type = OpType::D_DIRECT;
 		inst.op0.d_register.reg = dreg;
-		return read_ea(buffer, inst.op1, MEM_ALT, mode, reg, ea_size);
+		return decode_ea(buffer, inst.op1, MEM_ALT, mode, reg, ea_size);
 	}
 	else
 	{
 		// Dest is d-reg
 		inst.op1.type = OpType::D_DIRECT;
 		inst.op1.d_register.reg = dreg;
-		return read_ea(buffer, inst.op0, ALL, mode, reg, ea_size);
+		return decode_ea(buffer, inst.op0, ALL, mode, reg, ea_size);
 	}
 }
 
@@ -838,7 +854,7 @@ int Inst_addsuba(buffer_reader& buffer, instruction& inst, uint32_t header)
 
 	inst.op1.type = OpType::A_DIRECT;
 	inst.op1.a_register.reg = areg;
-	return read_ea(buffer, inst.op0, ALL, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op0, ALL, mode, reg, ea_size);
 }
 
 // ----------------------------------------------------------------------------
@@ -873,6 +889,7 @@ int Inst_shift_reg(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_stop(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint16_t val;
@@ -882,11 +899,14 @@ int Inst_stop(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
+// Instructions without any operands
 int Inst_simple(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_swap(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t reg = (header >> 0) & 7;
@@ -894,6 +914,7 @@ int Inst_swap(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_link_w(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t reg = (header >> 0) & 7;
@@ -908,6 +929,7 @@ int Inst_link_w(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_unlk(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t reg = (header >> 0) & 7;
@@ -915,6 +937,7 @@ int Inst_unlk(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_move_from_usp(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t reg = (header >> 0) & 7;
@@ -923,6 +946,7 @@ int Inst_move_from_usp(buffer_reader& buffer, instruction& inst, uint32_t header
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_move_to_usp(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t reg = (header >> 0) & 7;
@@ -931,46 +955,52 @@ int Inst_move_to_usp(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_move_to_ccr(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
 	inst.op1.type = OpType::CCR;
-	return read_ea(buffer, inst.op0, DATA, mode, reg, Size::WORD);
+	return decode_ea(buffer, inst.op0, DATA, mode, reg, Size::WORD);
 }
 
+// ----------------------------------------------------------------------------
 int Inst_nbcd(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	inst.suffix = Suffix::BYTE;
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return read_ea(buffer, inst.op0, DATA_ALT, mode, reg, Size::BYTE);
+	return decode_ea(buffer, inst.op0, DATA_ALT, mode, reg, Size::BYTE);
 }
 
+// ----------------------------------------------------------------------------
 int Inst_pea(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	inst.suffix = Suffix::LONG;
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return read_ea(buffer, inst.op0, CONTROL, mode, reg, Size::LONG);
+	return decode_ea(buffer, inst.op0, CONTROL, mode, reg, Size::LONG);
 }
 
+// ----------------------------------------------------------------------------
 // NOTE: identical to nbcd
 int Inst_tas(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return read_ea(buffer, inst.op0, DATA_ALT, mode, reg, Size::BYTE);
+	return decode_ea(buffer, inst.op0, DATA_ALT, mode, reg, Size::BYTE);
 }
 
+// ----------------------------------------------------------------------------
 // jmp/jsr
 int Inst_jump(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return read_ea(buffer, inst.op0, CONTROL, mode, reg, Size::NONE);
+	return decode_ea(buffer, inst.op0, CONTROL, mode, reg, Size::NONE);
 }
 
+// ----------------------------------------------------------------------------
 int Inst_asl_asr_mem(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t size = (header >> 6) & 3;
@@ -978,9 +1008,10 @@ int Inst_asl_asr_mem(buffer_reader& buffer, instruction& inst, uint32_t header)
 	uint8_t reg  = (header >> 0) & 7;
 	// "An operand in memory can be shifted one bit only, and the operand size is restricted to a word."
 	inst.suffix = Suffix::WORD;
-	return read_ea(buffer, inst.op0, MEM_ALT, mode, reg, Size::WORD);
+	return decode_ea(buffer, inst.op0, MEM_ALT, mode, reg, Size::WORD);
 }
 
+// ----------------------------------------------------------------------------
 int Inst_branch(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	int8_t disp8 = (int8_t)(header & 0xff);
@@ -1003,6 +1034,7 @@ int Inst_branch(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_ext(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	// NOTE: this needs to be changed if handling ext byte->long
@@ -1013,6 +1045,7 @@ int Inst_ext(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_movep_mem_reg(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 6) & 1;
@@ -1032,6 +1065,7 @@ int Inst_movep_mem_reg(buffer_reader& buffer, instruction& inst, uint32_t header
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_movep_reg_mem(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 6) & 1;
@@ -1050,6 +1084,7 @@ int Inst_movep_reg_mem(buffer_reader& buffer, instruction& inst, uint32_t header
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_dbcc(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t dreg  = (header >> 0) & 7;
@@ -1063,13 +1098,15 @@ int Inst_dbcc(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_scc(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return read_ea(buffer, inst.op0, DATA_ALT, mode, reg, Size::BYTE);
+	return decode_ea(buffer, inst.op0, DATA_ALT, mode, reg, Size::BYTE);
 }
 
+// ----------------------------------------------------------------------------
 int Inst_sbcd_reg(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t regx = (header >> 0) & 7;
@@ -1079,6 +1116,7 @@ int Inst_sbcd_reg(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_sbcd_predec(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t regx = (header >> 0) & 7;
@@ -1088,6 +1126,7 @@ int Inst_sbcd_predec(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_subx_reg(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t size = (header >> 6) & 3;
@@ -1102,6 +1141,7 @@ int Inst_subx_reg(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_subx_predec(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t size = (header >> 6) & 3;
@@ -1117,6 +1157,7 @@ int Inst_subx_predec(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_cmpm(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t size = (header >> 6) & 3;
@@ -1132,6 +1173,7 @@ int Inst_cmpm(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_cmpa(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
@@ -1144,12 +1186,13 @@ int Inst_cmpa(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 	inst.suffix = size_to_suffix(ea_size);
 
-	if (read_ea(buffer, inst.op0, ALL, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op0, ALL, mode, reg, ea_size))
 		return 1;
 	set_areg(inst.op1, areg);
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_cmp(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
@@ -1161,12 +1204,13 @@ int Inst_cmp(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 	inst.suffix = size_to_suffix(ea_size);
 
-	if (read_ea(buffer, inst.op0, ALL, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op0, ALL, mode, reg, ea_size))
 		return 1;
 	set_dreg(inst.op1, dreg);
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_eor(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
@@ -1182,11 +1226,12 @@ int Inst_eor(buffer_reader& buffer, instruction& inst, uint32_t header)
 	set_dreg(inst.op0, dreg);
 
 	// dest is EA
-	if (read_ea(buffer, inst.op1, DATA_ALT, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op1, DATA_ALT, mode, reg, ea_size))
 		return 1;
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_muldiv(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
@@ -1198,7 +1243,7 @@ int Inst_muldiv(buffer_reader& buffer, instruction& inst, uint32_t header)
 	inst.suffix = Suffix::WORD;
 
 	// src is EA
-	if (read_ea(buffer, inst.op0, DATA, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op0, DATA, mode, reg, ea_size))
 		return 1;
 
 	// dst is d-reg
@@ -1206,19 +1251,21 @@ int Inst_muldiv(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_chk(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t dreg = (header >> 9) & 7;
-    uint8_t size = (header >> 7) & 1;
+	uint8_t size = (header >> 7) & 1;
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
 	Size ea_size = size ? Size::LONG : Size::WORD;
 	inst.suffix = size_to_suffix(ea_size);
 
 	set_dreg(inst.op1, dreg);
-	return read_ea(buffer, inst.op0, DATA, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op0, DATA, mode, reg, ea_size);
 }
 
+// ----------------------------------------------------------------------------
 int Inst_exg_dd(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t regx = (header >> 0) & 7;
@@ -1228,6 +1275,7 @@ int Inst_exg_dd(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_exg_aa(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t regx = (header >> 0) & 7;
@@ -1237,6 +1285,7 @@ int Inst_exg_aa(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_exg_da(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t regx = (header >> 0) & 7;
@@ -1246,6 +1295,7 @@ int Inst_exg_da(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_imm_ccr(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint16_t val16;
@@ -1259,6 +1309,7 @@ int Inst_imm_ccr(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+// ----------------------------------------------------------------------------
 int Inst_imm_sr(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint16_t val16;
@@ -1282,13 +1333,16 @@ typedef int (*pfnDecoderFunc)(buffer_reader& buffer, instruction& inst, uint32_t
 //
 //	Entries go in the order Most specific -> Least Specific
 //	i.e. they should go in terms of decreasing "CT" i.e. bitcount
+
+// TODO remove is32 field
+// TODO switch tag to an instruction type
 struct matcher_entry
 {
-	uint32_t mask0;
-	uint32_t val0;
-	bool	is32;
-	const char* tag;
-	pfnDecoderFunc func;
+	uint32_t		mask0;
+	uint32_t		val0;
+	bool			is32;
+	const char*		tag;
+	pfnDecoderFunc	func;
 };
 
 #define MATCH_ENTRY1_IMPL(shift, bitcount, val, is32, tag, func)   \
@@ -1490,6 +1544,8 @@ matcher_entry g_matcher_table[] =
 };
 
 // ----------------------------------------------------------------------------
+//	INSTRUCTION DISPLAY FORMATTING
+// ----------------------------------------------------------------------------
 static const char* g_reg_names[] = 
 {
 	"d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
@@ -1600,12 +1656,12 @@ void print(const instruction& inst, FILE* pFile)
 			break;
 	}
 
-	if (inst.op0.type == OpType::kNone)
+	if (inst.op0.type == OpType::INVALID)
 		return;
 	fprintf(pFile, " ");
 	print(inst.op0, pFile);
 
-	if (inst.op1.type == OpType::kNone)
+	if (inst.op1.type == OpType::INVALID)
 		return;
 	fprintf(pFile, ",");
 	print(inst.op1, pFile);
