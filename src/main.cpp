@@ -1203,6 +1203,33 @@ int Inst_chk(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return read_ea(buffer, inst.op0, DATA, mode, reg, ea_size);
 }
 
+int Inst_exg_dd(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+	uint8_t regx = (header >> 0) & 7;
+	uint8_t regy = (header >> 9) & 7;
+	set_dreg(inst.op0, regx);
+	set_dreg(inst.op1, regy);
+	return 0;
+}
+
+int Inst_exg_aa(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+	uint8_t regx = (header >> 0) & 7;
+	uint8_t regy = (header >> 9) & 7;
+	set_areg(inst.op0, regx);
+	set_areg(inst.op1, regy);
+	return 0;
+}
+
+int Inst_exg_da(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+	uint8_t regx = (header >> 0) & 7;
+	uint8_t regy = (header >> 9) & 7;
+	set_dreg(inst.op0, regx);
+	set_areg(inst.op1, regy);
+	return 0;
+}
+
 // ----------------------------------------------------------------------------
 typedef int (*pfnDecoderFunc)(buffer_reader& buffer, instruction& inst, uint32_t header);
 
@@ -1410,12 +1437,13 @@ matcher_entry g_matcher_table[] =
 	MATCH_ENTRY2_IMPL(12, 4, 0b0100, 6, 3, 0b111   ,	false, "lea",			   Inst_lea ),
 	MATCH_ENTRY2_IMPL(12, 4, 0b1000, 6, 3, 0b011		,	false, "divu",			Inst_muldiv ),
 	MATCH_ENTRY2_IMPL(12, 4, 0b1000, 6, 3, 0b111		,	false, "divs",			Inst_muldiv ),
+	
+	// NOTE: specific case to override CHK since it doesn't support addressing mode 001	
+	MATCH_ENTRY2_IMPL(12, 4, 0b1100, 3, 6, 0b101000	 ,	false, "exg",			   Inst_exg_dd ),
+	MATCH_ENTRY2_IMPL(12, 4, 0b1100, 3, 6, 0b101001	 ,	false, "exg",			   Inst_exg_aa ),
+	MATCH_ENTRY2_IMPL(12, 4, 0b1100, 3, 6, 0b110001	 ,	false, "exg",			   Inst_exg_da ),
+	MATCH_ENTRY2_IMPL(12, 4, 0b0100, 6, 3, 0b110	 ,	false, "chk",			   Inst_chk ),
 	MATCH_ENTRY2_IMPL(12, 4, 0b0100, 6, 3, 0b100		,	false, "chk",			   Inst_chk ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b0100, 6, 3, 0b110		,	false, "chk",			   Inst_chk ),
-	MATCH_ENTRY2     (12, 4, 0b1100, 3, 6, 0b101000	 ,	false, "exg",			   Inst_exg_dd ),
-	MATCH_ENTRY2     (12, 4, 0b1100, 3, 6, 0b101001	 ,	false, "exg",			   Inst_exg_aa ),
-	// TODO seems to conflict with chk?
-	MATCH_ENTRY2     (12, 4, 0b1100, 3, 6, 0b110001	 ,	false, "exg",			   Inst_exg_da ),
 
 	//MATCH_ENTRY2_IMPL(12, 4, 0b1000, 6, 2, 0b11,   ,	false, "ora",				Inst_addsuba ),
 	MATCH_ENTRY2_IMPL(12, 4, 0b1001, 6, 2, 0b11   ,	false, "suba",				Inst_addsuba ),
