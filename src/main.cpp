@@ -103,7 +103,8 @@ enum OpType
 
 	// Specific registers
 	SR,
-	USP
+	USP,
+	CCR
 };
 
 // ----------------------------------------------------------------------------
@@ -923,6 +924,14 @@ int Inst_move_to_usp(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+int Inst_move_to_ccr(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+	uint8_t mode = (header >> 3) & 7;
+	uint8_t reg  = (header >> 0) & 7;
+	inst.op1.type = OpType::CCR;
+	return read_ea(buffer, inst.op0, DATA, mode, reg, Size::WORD);
+}
+
 int Inst_nbcd(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	inst.suffix = Suffix::BYTE;
@@ -1230,6 +1239,30 @@ int Inst_exg_da(buffer_reader& buffer, instruction& inst, uint32_t header)
 	return 0;
 }
 
+int Inst_imm_ccr(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+	uint16_t val16;
+	if (buffer.read_word(val16))
+		return 1;
+	if ((val16 & 0xff00) != 0)
+		return 1;
+
+	set_imm_byte(inst.op0, val16 & 0xff);
+	inst.op1.type = OpType::CCR;
+	return 0;
+}
+
+int Inst_imm_sr(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+	uint16_t val16;
+	if (buffer.read_word(val16))
+		return 1;
+
+	set_imm_word(inst.op0, val16);
+	inst.op1.type = OpType::SR;
+	return 0;
+}
+
 // ----------------------------------------------------------------------------
 typedef int (*pfnDecoderFunc)(buffer_reader& buffer, instruction& inst, uint32_t header);
 
@@ -1251,19 +1284,6 @@ struct matcher_entry
 	pfnDecoderFunc func;
 };
 
-#define MATCH_ENTRY1(shift, bitcount, val, is32, tag, func)   \
-	{ (((1U<<(bitcount))-1U)<<(shift)), (val<<(shift)), is32, tag, NULL }
-
-#define MATCH_ENTRY2(shift, bitcount, val, shift2, bitcount2, val2, is32, tag, func)   \
-	{ (((1U<<(bitcount))-1U)<<(shift)) | (((1U<<(bitcount2))-1U)<<(shift2)), \
-		(val<<(shift)) | (val2<<(shift2)), \
-	   is32, tag, NULL }
-
-#define MATCH_ENTRY3(shift, bitcount, val, shift2, bitcount2, val2, shift3, bitcount3, val3, is32, tag, func)   \
-	{ (((1U<<(bitcount))-1U)<<(shift)) | (((1U<<(bitcount2))-1U)<<(shift2))  | (((1U<<(bitcount3))-1U)<<(shift3)), \
-		(val<<(shift)) | (val2<<(shift2)) | (val3<<(shift3)), \
-	   is32, tag, NULL }
-
 #define MATCH_ENTRY1_IMPL(shift, bitcount, val, is32, tag, func)   \
 	{ (((1U<<(bitcount))-1U)<<(shift)), (val<<(shift)), is32, tag, func }
 
@@ -1279,10 +1299,14 @@ struct matcher_entry
 
 matcher_entry g_matcher_table[] =
 {
-	//		   SH CT									  F32	Tag				  Decoder
-	MATCH_ENTRY1( 8,24, 0b00100011110000000000	   ,	true,  "andi",			  Inst_imm_ccr ),
-	MATCH_ENTRY1( 8,24, 0b10100011110000000000	   ,	true,  "eori",			  Inst_imm_ccr ),
-	MATCH_ENTRY1( 8,24, 0b000000000011110000000000   ,	true,  "ori",			   Inst_imm_ccr ),
+	//		          SH CT									  F32	Tag				  Decoder
+	MATCH_ENTRY1_IMPL( 0,16, 0b0000001000111100		   ,	false,  "andi",			  Inst_imm_ccr ),
+	MATCH_ENTRY1_IMPL( 0,16, 0b0000101000111100		   ,	false,  "eori",			  Inst_imm_ccr ),
+	MATCH_ENTRY1_IMPL( 0,16, 0b0000000000111100		   ,	false,  "ori",			  Inst_imm_ccr ),
+	MATCH_ENTRY1_IMPL( 0,16, 0b0000000001111100		   ,	false, "ori",			  Inst_imm_sr ), // supervisor
+	MATCH_ENTRY1_IMPL( 0,16, 0b0000001001111100		   ,	false, "andi",			  Inst_imm_sr ), // supervisor
+	MATCH_ENTRY1_IMPL( 0,16, 0b0000101001111100		   ,	false, "eori",			  Inst_imm_sr ), // supervisor
+
 	MATCH_ENTRY1_IMPL( 0,16, 0b0100101011111100		   ,	false, "illegal",		   Inst_simple ),
 	MATCH_ENTRY1_IMPL( 0,16, 0b0100111001110000		   ,	false, "reset",			 Inst_simple ), // supervisor
 	MATCH_ENTRY1_IMPL( 0,16, 0b0100111001110001		   ,	false, "nop",			   Inst_simple ),
@@ -1291,9 +1315,6 @@ matcher_entry g_matcher_table[] =
 	MATCH_ENTRY1_IMPL( 0,16, 0b0100111001110110		   ,	false, "trapv",			 Inst_simple ),
 	MATCH_ENTRY1_IMPL( 0,16, 0b0100111001110111		   ,	false, "rtr",			   Inst_simple ),
 	MATCH_ENTRY1_IMPL( 0,16, 0b0100111001110010		   ,	false, "stop",			  Inst_stop ),
-	MATCH_ENTRY1( 0,16, 0b0000000001111100		   ,	false, "ori",			   Inst_imm_sr ), // supervisor
-	MATCH_ENTRY1( 0,16, 0b0000001001111100		   ,	false, "andi",			  Inst_imm_sr ), // supervisor
-	MATCH_ENTRY1( 0,16, 0b0000101001111100		   ,	false, "eori",			  Inst_imm_sr ), // supervisor
 
 	MATCH_ENTRY1_IMPL( 3,13, 0b0100100001000			  ,	false, "swap",			  Inst_swap ),
 	MATCH_ENTRY1_IMPL( 3,13, 0b0100111001010			  ,	false, "link.w",			Inst_link_w ),
@@ -1310,7 +1331,7 @@ matcher_entry g_matcher_table[] =
 	MATCH_ENTRY1_IMPL( 6,10, 0b0100000011				 ,	false, "move",			  Inst_move_from_sr ),   // supervisor
 	MATCH_ENTRY1_IMPL( 6,10, 0b0100011011				 ,	false, "move",			  Inst_move_to_sr ),   // supervisor
 	//([ ( 6,10, 0b0100001011)				 ,	false, "move from ccr",	 Inst ),		  # not on 68000
-	MATCH_ENTRY1( 6,10, 0b0100010011				 ,	false, "move",			  Inst_move_to_ccr ),
+	MATCH_ENTRY1_IMPL( 6,10, 0b0100010011				 ,	false, "move",			  Inst_move_to_ccr ),
 	MATCH_ENTRY1_IMPL( 6,10, 0b0100100000				 ,	false, "nbcd",			  Inst_nbcd ),
 	MATCH_ENTRY1_IMPL( 6,10, 0b0100100001				 ,	false, "pea",			   Inst_pea ),
 	MATCH_ENTRY1_IMPL( 6,10, 0b0100101011				 ,	false, "tas",			   Inst_tas ),
@@ -1357,8 +1378,6 @@ matcher_entry g_matcher_table[] =
 	MATCH_ENTRY1_IMPL( 8, 8, 0b01101110				   ,	false, "bgt",			   Inst_branch ),
 	MATCH_ENTRY1_IMPL( 8, 8, 0b01101111				   ,	false, "ble",			   Inst_branch ),
 	
-	//MATCH_ENTRY1_IMPL(12, 4, 0b0110					   ,	false, "bcc",			   Inst_branch),
-
 	MATCH_ENTRY2_IMPL(12, 4, 0b0000, 6, 3, 0b101		,	false, "bchg",			  Inst_bchg ),
 	MATCH_ENTRY2_IMPL(12, 4, 0b0000, 6, 3, 0b110		,	false, "bclr",			  Inst_bchg ),
 	MATCH_ENTRY2_IMPL(12, 4, 0b0000, 6, 3, 0b111		,	false, "bset",			  Inst_bchg ),
@@ -1445,7 +1464,6 @@ matcher_entry g_matcher_table[] =
 	MATCH_ENTRY2_IMPL(12, 4, 0b0100, 6, 3, 0b110	 ,	false, "chk",			   Inst_chk ),
 	MATCH_ENTRY2_IMPL(12, 4, 0b0100, 6, 3, 0b100		,	false, "chk",			   Inst_chk ),
 
-	//MATCH_ENTRY2_IMPL(12, 4, 0b1000, 6, 2, 0b11,   ,	false, "ora",				Inst_addsuba ),
 	MATCH_ENTRY2_IMPL(12, 4, 0b1001, 6, 2, 0b11   ,	false, "suba",				Inst_addsuba ),
 	MATCH_ENTRY2_IMPL(12, 4, 0b1101, 6, 2, 0b11   ,	false, "adda",				Inst_addsuba ),
 
@@ -1542,6 +1560,9 @@ void print(const operand& operand, FILE* pFile)
 			return;
 		case OpType::USP:
 			fprintf(pFile, "usp");
+			return;
+		case OpType::CCR:
+			fprintf(pFile, "ccr");
 			return;
 		default:
 			fprintf(pFile, "???");
