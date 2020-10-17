@@ -1605,6 +1605,33 @@ int decode(buffer_reader& buffer, instruction& inst)
 }
 
 // ----------------------------------------------------------------------------
+//	INSTRUCTION ANALYSIS
+// ----------------------------------------------------------------------------
+// Check if an instruction jumps to another known address, and return that address
+bool get_jump_target(const instruction& inst, uint32_t inst_address, uint32_t& target_address)
+{
+    target_address = 0;
+    if (!inst.tag)
+        return false;
+
+    if ((strcmp(inst.tag, "bra") == 0) ||
+        (strcmp(inst.tag, "bsr") == 0))
+    {
+        // Relative branch
+        assert(inst.op0.type == OpType::PC_DISP);
+        int16_t disp = inst.op0.pc_disp.disp;
+
+        // The base PC is always +2 from the instruction address, since
+        // the 68000 has already fetched the header word by then
+        target_address = inst_address + 2 + disp;
+        return true;
+    }
+
+    return false;
+}
+
+
+// ----------------------------------------------------------------------------
 //	HIGHER-LEVEL DISASSEMBLY CREATION
 // ----------------------------------------------------------------------------
 // Storage for an attempt at tokenising the memory
@@ -1783,6 +1810,16 @@ int print(const symbols& symbols, const disassembly& disasm)
 			print(line.inst, stdout);
 		else
 			printf("dc.w $%x", line.inst.header);
+
+        uint32_t target_pc;
+        if (get_jump_target(line.inst, line.address, target_pc))
+        {
+            printf("\t-> $%x", target_pc);
+            symbol sym2;
+            if (find_symbol(symbols, symbol::section_type::TEXT, target_pc, sym2))
+                printf("\t(%s)", sym2.label.c_str());
+        }
+
 		printf("\n");
 	}
 	return 0;
