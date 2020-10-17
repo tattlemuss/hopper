@@ -446,17 +446,17 @@ int decode_ea(buffer_reader& buffer, operand& operand, ea_group group, uint8_t m
 		INDIRECT_DISP,	    // (d16,An)   101 reg. number:An
 		INDIRECT_INDEX,	    // (d8,An,Xn) 110 reg. number:An
 
-        // 7 in "mode" bits, 0-4 in reg bits
-        //                                  mode reg
+		// 7 in "mode" bits, 0-4 in reg bits
+		//                                  mode reg
 		ABSOLUTE_WORD,      // (xxx).W      111 000
 		ABSOLUTE_LONG,      // (xxx).L      111 001
 		PC_DISP,		    // (d16,PC)     111 010
 		PC_DISP_INDEX,      // (d8,PC,Xn)   111 011
 		IMMEDIATE,          // <data>       111 100
-        INVALID,
+		INVALID,
 	};
-    assert(ea_type <= 7 + 4 + 1);
-    operand.type = types[ea_type];
+	assert(ea_type <= 7 + 4 + 1);
+	operand.type = types[ea_type];
 
 	uint16_t val16;
 	uint32_t val32;
@@ -1610,27 +1610,27 @@ int decode(buffer_reader& buffer, instruction& inst)
 // Check if an instruction jumps to another known address, and return that address
 bool calc_relative_address(const operand& op, uint32_t inst_address, uint32_t& target_address)
 {
-    if (op.type == PC_DISP)
-    {
-        // Relative
-        int16_t disp = op.pc_disp.disp;
+	if (op.type == PC_DISP)
+	{
+		// Relative
+		int16_t disp = op.pc_disp.disp;
 
-        // The base PC is always +2 from the instruction address, since
-        // the 68000 has already fetched the header word by then
-        target_address = inst_address + 2 + disp;
-        return true;
-    }
-    else if (op.type == PC_DISP_INDEX)
-    {
-        // Relative
-        int8_t disp = op.pc_disp_index.disp;
+		// The base PC is always +2 from the instruction address, since
+		// the 68000 has already fetched the header word by then
+		target_address = inst_address + 2 + disp;
+		return true;
+	}
+	else if (op.type == PC_DISP_INDEX)
+	{
+		// Relative
+		int8_t disp = op.pc_disp_index.disp;
 
-        // The base PC is always +2 from the instruction address, since
-        // the 68000 has already fetched the header word by then
-        target_address = inst_address + 2 + disp;
-        return true;
-    }
-    return false;
+		// The base PC is always +2 from the instruction address, since
+		// the 68000 has already fetched the header word by then
+		target_address = inst_address + 2 + disp;
+		return true;
+	}
+	return false;
 }
 
 
@@ -1641,32 +1641,32 @@ bool calc_relative_address(const operand& op, uint32_t inst_address, uint32_t& t
 class disassembly
 {
 public:
-    struct line
-    {
-        uint32_t    address;
-        instruction inst;
-    };
+	struct line
+	{
+		uint32_t    address;
+		instruction inst;
+	};
 
-    std::vector<line>    lines;
+	std::vector<line>    lines;
 };
 
 int decode_buf(buffer_reader& buf, const symbols& symbols, disassembly& disasm)
 {
 	while (buf.get_remain() >= 2)
 	{
-        disassembly::line line;
-        line.address = buf.get_pos();
+		disassembly::line line;
+		line.address = buf.get_pos();
 
-        // decode uses a copy of the buffer state
+		// decode uses a copy of the buffer state
 		buffer_reader buf_copy(buf);
 		int res = decode(buf_copy, line.inst);
 
-        // Handle failure
+		// Handle failure
 		if (res != 0)
-            line.inst.tag = NULL;
-        disasm.lines.push_back(line);
+			line.inst.tag = NULL;
+		disasm.lines.push_back(line);
 
-        buf.advance(line.inst.byte_count);
+		buf.advance(line.inst.byte_count);
 	}
 	return 0;
 }
@@ -1717,49 +1717,49 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 				fprintf(pFile, "$%x.w", operand.absolute_word.wordaddr);
 			return;
 		case OpType::ABSOLUTE_LONG:
-        {
-            symbol sym;
-            if (find_symbol(symbols, symbol::section_type::TEXT, operand.absolute_long.longaddr, sym))
-    			fprintf(pFile, "%s", sym.label.c_str());
-            else
-			    fprintf(pFile, "$%x.l",
+		{
+			symbol sym;
+			if (find_symbol(symbols, symbol::section_type::TEXT, operand.absolute_long.longaddr, sym))
+				fprintf(pFile, "%s", sym.label.c_str());
+			else
+				fprintf(pFile, "$%x.l",
 					operand.absolute_long.longaddr);
 			return;
-        }
+		}
 		case OpType::PC_DISP:
-        {
-            symbol sym;
-            uint32_t target_address;
-            calc_relative_address(operand, inst_address, target_address);
-            if (find_symbol(symbols, symbol::section_type::TEXT, target_address, sym))
-    			fprintf(pFile, "%s(pc)", sym.label.c_str());
-            else
-    			fprintf(pFile, "$%x(pc)", target_address);
+		{
+			symbol sym;
+			uint32_t target_address;
+			calc_relative_address(operand, inst_address, target_address);
+			if (find_symbol(symbols, symbol::section_type::TEXT, target_address, sym))
+				fprintf(pFile, "%s(pc)", sym.label.c_str());
+			else
+				fprintf(pFile, "$%x(pc)", target_address);
 			return;
-        }
+		}
 		case OpType::PC_DISP_INDEX:
-        {
-            symbol sym;
-            uint32_t target_address;
-            calc_relative_address(operand, inst_address, target_address);
+		{
+			symbol sym;
+			uint32_t target_address;
+			calc_relative_address(operand, inst_address, target_address);
 
-            if (find_symbol(symbols, symbol::section_type::TEXT, target_address, sym))
-            {
-                fprintf(pFile, "%s(pc,d%d.%s)",
-                        sym.label.c_str(),
-                        operand.pc_disp_index.d_reg,
-                        operand.pc_disp_index.is_long ? "l" : "w");
-            }
-            else
-            {
-            	fprintf(pFile, "$%x(pc,d%d.%s)",
+			if (find_symbol(symbols, symbol::section_type::TEXT, target_address, sym))
+			{
+				fprintf(pFile, "%s(pc,d%d.%s)",
+						sym.label.c_str(),
+						operand.pc_disp_index.d_reg,
+						operand.pc_disp_index.is_long ? "l" : "w");
+			}
+			else
+			{
+				fprintf(pFile, "$%x(pc,d%d.%s)",
 					target_address,
 					operand.pc_disp_index.d_reg,
 					operand.pc_disp_index.is_long ? "l" : "w");
 
-            }
+			}
 			return;
-        }
+		}
 		case OpType::MOVEM_REG:
 		{
 			bool first = true;
@@ -1829,9 +1829,9 @@ void print(const instruction& inst, const symbols& symbols, uint32_t inst_addres
 // ----------------------------------------------------------------------------
 int print(const symbols& symbols, const disassembly& disasm)
 {
-    for (size_t i = 0; i < disasm.lines.size(); ++i)
+	for (size_t i = 0; i < disasm.lines.size(); ++i)
 	{
-        const disassembly::line& line = disasm.lines[i];
+		const disassembly::line& line = disasm.lines[i];
 
 		// TODO very naive label check
 		symbol sym;
@@ -1848,6 +1848,44 @@ int print(const symbols& symbols, const disassembly& disasm)
 		printf("\n");
 	}
 	return 0;
+}
+
+
+void add_reference_symbols(const disassembly& disasm, symbols& symbols)
+{
+	uint32_t label_id = 0;
+	for (size_t i = 0; i < disasm.lines.size(); ++i)
+	{
+		const disassembly::line& line = disasm.lines[i];
+		uint32_t target_address;
+
+		if (calc_relative_address(line.inst.op0, line.address, target_address))
+		{
+			symbol sym;
+			if (!find_symbol(symbols, symbol::section_type::TEXT, target_address, sym))
+			{
+				sym.address = target_address;
+				sym.section = symbol::section_type::TEXT;
+				sym.label = std::string("L") + std::to_string(label_id);
+				symbols.table.push_back(sym);
+				++label_id;
+			}
+		}
+		if (calc_relative_address(line.inst.op1, line.address, target_address))
+		{
+			symbol sym;
+			if (!find_symbol(symbols, symbol::section_type::TEXT, target_address, sym))
+			{
+				sym.address = target_address;
+				sym.section = symbol::section_type::TEXT;
+				sym.label = std::string("L") + std::to_string(label_id);
+				symbols.table.push_back(sym);
+				++label_id;
+			}
+		}
+	}
+
+
 }
 
 // ----------------------------------------------------------------------------
@@ -1968,12 +2006,14 @@ int process_tos_file(const uint8_t* pData, long size)
 
 	int ret = read_symbols(symbol_buf, exe_symbols);
 
-    disassembly disasm;
-    if (decode_buf(text_buf, exe_symbols, disasm))
-        return 1;
+	disassembly disasm;
+	if (decode_buf(text_buf, exe_symbols, disasm))
+		return 1;
 
-    print(exe_symbols, disasm);
-    return 0;
+	add_reference_symbols(disasm, exe_symbols);
+
+	print(exe_symbols, disasm);
+	return 0;
 }
 
 // ----------------------------------------------------------------------------
