@@ -144,16 +144,16 @@ enum OpType
 	A_DIRECT,			// An		 001 reg. number:An
 	INDIRECT,			// (An)	   010 reg. number:An
 	INDIRECT_POSTINC,	// (An) +	 011 reg. number:An
-	INDIRECT_PREDEC,	 // – (An)	 100 reg. number:An
-	INDIRECT_DISP,	   // (d16,An)   101 reg. number:An
-	INDIRECT_INDEX,	  // (d8,An,Xn) 110 reg. number:An
-	ABSOLUTE_WORD,	   // (xxx).W	111 000
-	ABSOLUTE_LONG,	   // (xxx).L	111 001
-	PC_DISP,			 // (d16,PC)   111 010
-	PC_DISP_INDEX,	   // (d8,PC,Xn) 111 011
-	IMMEDIATE,		   // <data>	 111 100
-	MOVEM_REG,		  // mask of registers
-
+	INDIRECT_PREDEC,	// – (An)	 100 reg. number:An
+	INDIRECT_DISP,		// (d16,An)   101 reg. number:An
+	INDIRECT_INDEX,		// (d8,An,Xn) 110 reg. number:An
+	ABSOLUTE_WORD,		// (xxx).W	111 000
+	ABSOLUTE_LONG,		// (xxx).L	111 001
+	PC_DISP,			// (d16,PC)   111 010
+	PC_DISP_INDEX,		// (d8,PC,Xn) 111 011
+	IMMEDIATE,			// <data>	 111 100
+	MOVEM_REG,			// mask of registers
+	RELATIVE_BRANCH,	// +/- 32K branch, doesn't display (pc)
 	// Specific registers
 	SR,
 	USP,
@@ -246,6 +246,12 @@ struct operand
 		{
 			uint16_t reg_mask;
 		} movem_reg;
+
+		struct
+		{
+			int16_t disp;
+		} relative_branch;
+
 	};
 };
 
@@ -1015,19 +1021,19 @@ int Inst_branch(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	int8_t disp8 = (int8_t)(header & 0xff);
 
-	inst.op0.type = PC_DISP;
+	inst.op0.type = RELATIVE_BRANCH;
 	if (disp8 == 0)
 	{
 		// 16-bit offset
 		uint16_t disp16;
 		if (buffer.read_word(disp16))
 			return 1;
-		inst.op0.pc_disp.disp = (int16_t)disp16;
+		inst.op0.relative_branch.disp = (int16_t)disp16;
 		inst.suffix = Suffix::WORD;
 	}
 	else
 	{
-		inst.op0.pc_disp.disp = disp8;
+		inst.op0.relative_branch.disp = disp8;
 		inst.suffix = Suffix::SHORT;
 	}
 	return 0;
@@ -1092,8 +1098,8 @@ int Inst_dbcc(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 
 	set_dreg(inst.op0, dreg);
-	inst.op1.type = PC_DISP;
-	inst.op1.pc_disp.disp = (int16_t)disp16;
+	inst.op1.type = RELATIVE_BRANCH;
+	inst.op1.relative_branch.disp = (int16_t)disp16;
 	return 0;
 }
 
@@ -1629,6 +1635,16 @@ bool calc_relative_address(const operand& op, uint32_t inst_address, uint32_t& t
 		target_address = inst_address + 2 + disp;
 		return true;
 	}
+	if (op.type == RELATIVE_BRANCH)
+	{
+		// Relative
+		int16_t disp = op.relative_branch.disp;
+
+		// The base PC is always +2 from the instruction address, since
+		// the 68000 has already fetched the header word by then
+		target_address = inst_address + 2 + disp;
+		return true;
+	}
 	return false;
 }
 
@@ -1770,6 +1786,17 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 					fprintf(pFile, "%s", g_reg_names[i]);
 					first = false;
 				}
+			return;
+		}
+		case OpType::RELATIVE_BRANCH:
+		{
+			symbol sym;
+			uint32_t target_address;
+			calc_relative_address(operand, inst_address, target_address);
+			if (find_symbol(symbols, target_address, sym))
+				fprintf(pFile, "%s", sym.label.c_str());
+			else
+				fprintf(pFile, "$%x", target_address);
 			return;
 		}
 
