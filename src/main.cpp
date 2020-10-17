@@ -353,20 +353,20 @@ enum ea_group
 // Defines which instruction modes are allowed to have which EA modes
 bool mode_availability[][ea_group::COUNT] = 
 {
-	// DataAlt Data	 MemAlt   Mem	  Con	  ConMovem CMovem2  Alt	 All
-	{ true,	    true,	false,   false,   false,   false,   false,   true,   true	}, // D_DIRECT			000 regno
-	{ false,    false,  false,   false,   false,   false,   false,   true,   true	}, // A_DIRECT			001 regno
-	{ true,     true,	true,	true,	true,	true,	true,	true,   true	}, // INDIRECT			010 regno
-	{ true,     true,	true,	true,	false,   false,   true,	true,   true	}, // INDIRECT_POSTINC	011 regno
-	{ true,     true,	true,	true,	false,   true,	true,	true,   true	}, // INDIRECT_PREDEC	 100 regno
-	{ true,     true,	true,	true,	true,	true,	true,	true,   true	}, // INDIRECT_DISP	   101 regno
-	{ true,     true,	true,	true,	true,	true,	true,	true,   true	}, // INDIRECT_INDEX,	 110 regno
-	{ true,     true,	true,	true,	true,	true,	true,	true,   true	}, // ABSOLUTE_WORD	   111 000
-	{ true,     true,	true,	true,	true,	true,	true,	true,   true	}, // ABSOLUTE_LONG	   111 001  // There is a typo in the doc here
-	{ false,    true,	false,   true,	true,	true,	true,	false,  true	}, // PC_DISP			 111 010
-	{ false,    true,	false,   true,	true,	true,	true,	false,  true	}, // PC_DISP_INDEX	   111 011
-	{ false,    true,	false,   true,	false,   false,   false,   false,  true	    }, // IMMEDIATE		   111 100
-	{ false,    false,	false,   false,	false,   false,   false,   false,  false	}, // INVALID		   111 100
+	// DataAlt	Data	MemAlt	Mem		Ctrl	CMovem	CMovem2	Alt		All
+	{	true,	true,	false,	false,	false,	false,	false,	true,	true	}, // D_DIRECT			000 regno
+	{	false,	false,	false,	false,	false,	false,	false,	true,	true	}, // A_DIRECT			001 regno
+	{	true,	true,	true,	true,	true,	true,	true,	true,	true	}, // INDIRECT			010 regno
+	{	true,	true,	true,	true,	false,	false,	true,	true,	true	}, // INDIRECT_POSTINC	011 regno
+	{	true,	true,	true,	true,	false,	true,	true,	true,	true	}, // INDIRECT_PREDEC	 100 regno
+	{	true,	true,	true,	true,	true,	true,	true,	true,	true	}, // INDIRECT_DISP	   101 regno
+	{	true,	true,	true,	true,	true,	true,	true,	true,	true	}, // INDIRECT_INDEX,	 110 regno
+	{	true,	true,	true,	true,	true,	true,	true,	true,	true	}, // ABSOLUTE_WORD	   111 000
+	{	true,	true,	true,	true,	true,	true,	true,	true,	true	}, // ABSOLUTE_LONG	   111 001  // There is a typo in the doc here
+	{	false,  true,	false,	true,	true,	true,	true,	false,	true	}, // PC_DISP			 111 010
+	{	false,  true,	false,	true,	true,	true,	true,	false,	true	}, // PC_DISP_INDEX	   111 011
+	{	false,  true,	false,	true,	false,	false,	false,	false,	true	}, // IMMEDIATE		   111 100
+	{	false,  false,	false,	false,	false,	false,	false,	false,	false	}, // INVALID		   111 100
 };
 
 // There is a consistent approach to decoding the mode bits (0-6),
