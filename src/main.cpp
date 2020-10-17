@@ -73,7 +73,7 @@ public:
 	uint32_t get_pos() const
 	{
 		return m_pos;
-	}	
+	}
 
 	uint32_t get_remain() const
 	{
@@ -351,7 +351,7 @@ enum ea_group
 };
 
 // Defines which instruction modes are allowed to have which EA modes
-bool mode_availability[][ea_group::COUNT] = 
+bool mode_availability[][ea_group::COUNT] =
 {
 	// DataAlt	Data	MemAlt	Mem		Ctrl	CMovem	CMovem2	Alt		All
 	{	true,	true,	false,	false,	false,	false,	false,	true,	true	}, // D_DIRECT			000 regno
@@ -376,7 +376,7 @@ uint8_t decode_operand_type(uint8_t mode_bits, uint8_t reg_bits)
 {
 	if (mode_bits < 7)
 		return mode_bits;
-	
+
 	if (reg_bits <= 4)
 		return  7 + reg_bits;
 
@@ -627,7 +627,7 @@ int Inst_movem_reg_mem(buffer_reader& buffer, instruction& inst, uint32_t header
 	uint8_t reg  = (header >> 0) & 7;
 	Size ea_size = (header >> 6) & 1 ? Size::LONG : Size::WORD;
 	inst.suffix = (header >> 6) & 1 ? Suffix::LONG : Suffix::WORD;
-	
+
 	uint16_t reg_mask;
 	if (buffer.read_word(reg_mask))
 		return 1;
@@ -783,7 +783,7 @@ int Inst_bchg_imm(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	
+
 	// Read the immediate data
 	uint16_t imm;
 	if (buffer.read_word(imm))
@@ -869,7 +869,7 @@ int Inst_shift_reg(buffer_reader& buffer, instruction& inst, uint32_t header)
 	uint8_t size	 = (header >> 6) & 3;
 	uint8_t countreg = (header >> 5) & 1;
 	uint8_t dreg	 = (header >> 0) & 7;
-	
+
 	Size ea_size = standard_size_table[size];
 	if (ea_size == Size::NONE)
 		return 1;
@@ -1345,205 +1345,203 @@ struct matcher_entry
 {
 	uint32_t		mask0;
 	uint32_t		val0;
-	bool			is32;
 	const char*		tag;
 	pfnDecoderFunc	func;
 };
 
-#define MATCH_ENTRY1_IMPL(shift, bitcount, val, is32, tag, func)   \
-	{ (((1U<<(bitcount))-1U)<<(shift)), (val<<(shift)), is32, tag, func }
+#define MATCH_ENTRY1_IMPL(shift, bitcount, val, tag, func)   \
+	{ (((1U<<(bitcount))-1U)<<(shift)), (val<<(shift)), tag, func }
 
-#define MATCH_ENTRY2_IMPL(shift, bitcount, val, shift2, bitcount2, val2, is32, tag, func)   \
+#define MATCH_ENTRY2_IMPL(shift, bitcount, val, shift2, bitcount2, val2, tag, func)   \
 	{ (((1U<<(bitcount))-1U)<<(shift)) | (((1U<<(bitcount2))-1U)<<(shift2)), \
 		(val<<(shift)) | (val2<<(shift2)), \
-	   is32, tag, func }
+	   tag, func }
 
-#define MATCH_ENTRY3_IMPL(shift, bitcount, val, shift2, bitcount2, val2, shift3, bitcount3, val3, is32, tag, func)   \
+#define MATCH_ENTRY3_IMPL(shift, bitcount, val, shift2, bitcount2, val2, shift3, bitcount3, val3, tag, func)   \
 	{ (((1U<<(bitcount))-1U)<<(shift)) | (((1U<<(bitcount2))-1U)<<(shift2))  | (((1U<<(bitcount3))-1U)<<(shift3)), \
 		(val<<(shift)) | (val2<<(shift2)) | (val3<<(shift3)), \
-	   is32, tag, func }
+	   tag, func }
 
 matcher_entry g_matcher_table[] =
 {
-	//		          SH CT									  F32	Tag				  Decoder
-	MATCH_ENTRY1_IMPL( 0,16, 0b0000001000111100		   ,	false,  "andi",			  Inst_imm_ccr ),
-	MATCH_ENTRY1_IMPL( 0,16, 0b0000101000111100		   ,	false,  "eori",			  Inst_imm_ccr ),
-	MATCH_ENTRY1_IMPL( 0,16, 0b0000000000111100		   ,	false,  "ori",			  Inst_imm_ccr ),
-	MATCH_ENTRY1_IMPL( 0,16, 0b0000000001111100		   ,	false, "ori",			  Inst_imm_sr ), // supervisor
-	MATCH_ENTRY1_IMPL( 0,16, 0b0000001001111100		   ,	false, "andi",			  Inst_imm_sr ), // supervisor
-	MATCH_ENTRY1_IMPL( 0,16, 0b0000101001111100		   ,	false, "eori",			  Inst_imm_sr ), // supervisor
+	//		          SH CT							Tag				  Decoder
+	MATCH_ENTRY1_IMPL(0,16,0b0000001000111100,		"andi",			  Inst_imm_ccr ),
+	MATCH_ENTRY1_IMPL(0,16,0b0000101000111100,		"eori",			  Inst_imm_ccr ),
+	MATCH_ENTRY1_IMPL(0,16,0b0000000000111100,		"ori",			  Inst_imm_ccr ),
+	MATCH_ENTRY1_IMPL(0,16,0b0000000001111100,		"ori",			  Inst_imm_sr ), // supervisor
+	MATCH_ENTRY1_IMPL(0,16,0b0000001001111100,		"andi",			  Inst_imm_sr ), // supervisor
+	MATCH_ENTRY1_IMPL(0,16,0b0000101001111100,		"eori",			  Inst_imm_sr ), // supervisor
 
-	MATCH_ENTRY1_IMPL( 0,16, 0b0100101011111100		   ,	false, "illegal",		   Inst_simple ),
-	MATCH_ENTRY1_IMPL( 0,16, 0b0100111001110000		   ,	false, "reset",			 Inst_simple ), // supervisor
-	MATCH_ENTRY1_IMPL( 0,16, 0b0100111001110001		   ,	false, "nop",			   Inst_simple ),
-	MATCH_ENTRY1_IMPL( 0,16, 0b0100111001110011		   ,	false, "rte",			   Inst_simple ), // supervisor
-	MATCH_ENTRY1_IMPL( 0,16, 0b0100111001110101		   ,	false, "rts",			   Inst_simple ),
-	MATCH_ENTRY1_IMPL( 0,16, 0b0100111001110110		   ,	false, "trapv",			 Inst_simple ),
-	MATCH_ENTRY1_IMPL( 0,16, 0b0100111001110111		   ,	false, "rtr",			   Inst_simple ),
-	MATCH_ENTRY1_IMPL( 0,16, 0b0100111001110010		   ,	false, "stop",			  Inst_stop ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100101011111100,		"illegal",		   Inst_simple ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110000,		"reset",			 Inst_simple ), // supervisor
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110001,		"nop",			   Inst_simple ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110011,		"rte",			   Inst_simple ), // supervisor
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110101,		"rts",			   Inst_simple ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110110,		"trapv",			 Inst_simple ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110111,		"rtr",			   Inst_simple ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110010,		"stop",			  Inst_stop ),
 
-	MATCH_ENTRY1_IMPL( 3,13, 0b0100100001000			  ,	false, "swap",			  Inst_swap ),
-	MATCH_ENTRY1_IMPL( 3,13, 0b0100111001010			  ,	false, "link.w",			Inst_link_w ),
-	//([ ( 3,13, 0b0100100000001)			  ,	false, "link.l",			Inst_link_l ),  # not on 68000
-	MATCH_ENTRY1_IMPL( 3,13, 0b0100111001011			  ,	false, "unlk",			  Inst_unlk ),
-	MATCH_ENTRY1_IMPL( 3,13, 0b0100111001100			  ,	false, "move",			  Inst_move_to_usp ),
-	MATCH_ENTRY1_IMPL( 3,13, 0b0100111001101			  ,	false, "move",			  Inst_move_from_usp ),
-	MATCH_ENTRY1_IMPL( 3,13, 0b0100100010000			  ,	false, "ext",			 Inst_ext ),
-	MATCH_ENTRY1_IMPL( 3,13, 0b0100100011000			  ,	false, "ext",			 Inst_ext ),
-	//([ ( 3,13, 0b0100100011000)			  ,	false, "extb.l",			Inst_ext ),	 # not on 68000
+	MATCH_ENTRY1_IMPL(3,13,0b0100100001000,			"swap",			  Inst_swap ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100111001010,			"link.w",			Inst_link_w ),
+	//([ ( 3,13, 0b0100100000001)			  ,		"link.l",			Inst_link_l ),  # not on 68000
+	MATCH_ENTRY1_IMPL(3,13,0b0100111001011,			"unlk",			  Inst_unlk ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100111001100,			"move",			  Inst_move_to_usp ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100111001101,			"move",			  Inst_move_from_usp ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100100010000,			"ext",			 Inst_ext ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100100011000,			"ext",			 Inst_ext ),
+	//([ ( 3,13, 0b0100100011000)			  ,		"extb.l",			Inst_ext ),	 # not on 68000
 
-	MATCH_ENTRY1_IMPL( 4,12, 0b010011100100			   ,	false, "trap",			  Inst_trap ),
+	MATCH_ENTRY1_IMPL(4,12,0b010011100100,			"trap",			  Inst_trap ),
 
-	MATCH_ENTRY1_IMPL( 6,10, 0b0100000011				 ,	false, "move",			  Inst_move_from_sr ),   // supervisor
-	MATCH_ENTRY1_IMPL( 6,10, 0b0100011011				 ,	false, "move",			  Inst_move_to_sr ),   // supervisor
-	//([ ( 6,10, 0b0100001011)				 ,	false, "move from ccr",	 Inst ),		  # not on 68000
-	MATCH_ENTRY1_IMPL( 6,10, 0b0100010011				 ,	false, "move",			  Inst_move_to_ccr ),
-	MATCH_ENTRY1_IMPL( 6,10, 0b0100100000				 ,	false, "nbcd",			  Inst_nbcd ),
-	MATCH_ENTRY1_IMPL( 6,10, 0b0100100001				 ,	false, "pea",			   Inst_pea ),
-	MATCH_ENTRY1_IMPL( 6,10, 0b0100101011				 ,	false, "tas",			   Inst_tas ),
-	MATCH_ENTRY1_IMPL( 6,10, 0b0100111010				 ,	false, "jsr",			   Inst_jump ),
-	MATCH_ENTRY1_IMPL( 6,10, 0b0100111011				 ,	false, "jmp",			   Inst_jump ),
-	MATCH_ENTRY1_IMPL( 6,10, 0b1110000011				 ,	false, "asr",			   Inst_asl_asr_mem ),
-	MATCH_ENTRY1_IMPL( 6,10, 0b1110000111				 ,	false, "asl",			   Inst_asl_asr_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100000011,			"move",			  Inst_move_from_sr ),   // supervisor
+	MATCH_ENTRY1_IMPL(6,10,0b0100011011,			"move",			  Inst_move_to_sr ),   // supervisor
+	//([ ( 6,10, 0b0100001011)				 ,		"move from ccr",	 Inst ),		  # not on 68000
+	MATCH_ENTRY1_IMPL(6,10,0b0100010011,			"move",			  Inst_move_to_ccr ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100100000,			"nbcd",			  Inst_nbcd ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100100001,			"pea",			   Inst_pea ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100101011,			"tas",			   Inst_tas ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100111010,			"jsr",			   Inst_jump ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100111011,			"jmp",			   Inst_jump ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110000011,			"asr",			   Inst_asl_asr_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110000111,			"asl",			   Inst_asl_asr_mem ),
 
-	MATCH_ENTRY2_IMPL(12, 4, 0b0000, 3, 6, 0b100001	 ,	false, "movep",		   Inst_movep_mem_reg ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b0000, 3, 6, 0b101001	 ,	false, "movep",		   Inst_movep_mem_reg ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b0000, 3, 6, 0b110001	 ,	false, "movep",		   Inst_movep_reg_mem ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b0000, 3, 6, 0b111001	 ,	false, "movep",		   Inst_movep_reg_mem ),
-	MATCH_ENTRY1_IMPL(6,10, 0b0000100001	  ,	false,  "bchg",			  Inst_bchg_imm ),
-	MATCH_ENTRY1_IMPL(6,10, 0b0000100010	  ,	false,  "bclr",			  Inst_bchg_imm ),
-	MATCH_ENTRY1_IMPL(6,10, 0b0000100011	  ,	false,  "bset",			  Inst_bchg_imm ),
-	MATCH_ENTRY1_IMPL(6,10, 0b0000100000	  ,	false,  "btst",			  Inst_bchg_imm ),
-	MATCH_ENTRY1_IMPL( 7, 9, 0b010010001	 ,	false, "movem",		   Inst_movem_reg_mem ), // Register to memory.
-	MATCH_ENTRY1_IMPL( 7, 9, 0b010011001	 ,	false, "movem",		   Inst_movem_mem_reg ), // Memory to register.
-	MATCH_ENTRY1_IMPL( 8, 8, 0b00000000				  ,	false, "ori",			   Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b00000010				  ,	false, "andi",			  Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b00000100				   ,	false, "subi",			  Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b00000110				  ,	false, "addi",			  Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b00001010				   ,	false, "eori",			  Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b00001100				   ,	false, "cmpi",			  Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01000000				   ,	false, "negx",			  Inst_size_ea ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01000010				   ,	false, "clr",			   Inst_size_ea ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01000100				   ,	false, "neg",			   Inst_size_ea ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01000110				   ,	false, "not",			   Inst_size_ea ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01001010				   ,	false, "tst",			   Inst_size_ea ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01100000				   ,	false, "bra",			   Inst_branch ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01100001				   ,	false, "bsr",			   Inst_branch ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01100010				   ,	false, "bhi",			   Inst_branch ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01100011				   ,	false, "bls",			   Inst_branch ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01100100				   ,	false, "bcc",			   Inst_branch ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01100101				   ,	false, "bcs",			   Inst_branch ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01100110				   ,	false, "bne",			   Inst_branch ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01100111				   ,	false, "beq",			   Inst_branch ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01101000				   ,	false, "bvc",			   Inst_branch ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01101001				   ,	false, "bvs",			   Inst_branch ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01101010				   ,	false, "bpl",			   Inst_branch ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01101011				   ,	false, "bmi",			   Inst_branch ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01101100				   ,	false, "bge",			   Inst_branch ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01101101				   ,	false, "blt",			   Inst_branch ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01101110				   ,	false, "bgt",			   Inst_branch ),
-	MATCH_ENTRY1_IMPL( 8, 8, 0b01101111				   ,	false, "ble",			   Inst_branch ),
-	
-	MATCH_ENTRY2_IMPL(12, 4, 0b0000, 6, 3, 0b101		,	false, "bchg",			  Inst_bchg ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b0000, 6, 3, 0b110		,	false, "bclr",			  Inst_bchg ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b0000, 6, 3, 0b111		,	false, "bset",			  Inst_bchg ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b0000, 6, 3, 0b100		,	false, "btst",			  Inst_bchg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b100001,	"movep",		   Inst_movep_mem_reg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b101001,	"movep",		   Inst_movep_mem_reg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b110001,	"movep",		   Inst_movep_reg_mem ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b111001,	"movep",		   Inst_movep_reg_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000100001,			"bchg",			  Inst_bchg_imm ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000100010,			"bclr",			  Inst_bchg_imm ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000100011,			"bset",			  Inst_bchg_imm ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000100000,			"btst",			  Inst_bchg_imm ),
+	MATCH_ENTRY1_IMPL(7,9,0b010010001,				"movem",		   Inst_movem_reg_mem ), // Register to memory.
+	MATCH_ENTRY1_IMPL(7,9,0b010011001,				"movem",		   Inst_movem_mem_reg ), // Memory to register.
+	MATCH_ENTRY1_IMPL(8,8,0b00000000,				"ori",			   Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00000010,				"andi",			  Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00000100,				"subi",			  Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00000110,				"addi",			  Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00001010,				"eori",			  Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00001100,				"cmpi",			  Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b01000000,				"negx",			  Inst_size_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b01000010,				"clr",			   Inst_size_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b01000100,				"neg",			   Inst_size_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b01000110,				"not",			   Inst_size_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b01001010,				"tst",			   Inst_size_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100000,				"bra",			   Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100001,				"bsr",			   Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100010,				"bhi",			   Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100011,				"bls",			   Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100100,				"bcc",			   Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100101,				"bcs",			   Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100110,				"bne",			   Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100111,				"beq",			   Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101000,				"bvc",			   Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101001,				"bvs",			   Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101010,				"bpl",			   Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101011,				"bmi",			   Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101100,				"bge",			   Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101101,				"blt",			   Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101110,				"bgt",			   Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101111,				"ble",			   Inst_branch ),
+
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b101,		"bchg",			  Inst_bchg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b110,		"bclr",			  Inst_bchg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b111,		"bset",			  Inst_bchg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b100,		"btst",			  Inst_bchg ),
 
 	//Table 3-19. Conditional Tests
 	// These sneakily take the "001" in the bottom 3 bits to override the EA parts of Scc
-	MATCH_ENTRY1_IMPL(3, 13, 0b0101000011001	 ,	false, "dbra",				Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3, 13, 0b0101000111001	 ,	false, "dbf",				 Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3, 13, 0b0101001011001	 ,	false, "dbhi",				Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3, 13, 0b0101001111001	 ,	false, "dbls",				Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3, 13, 0b0101010011001	 ,	false, "dbcc",				Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3, 13, 0b0101010111001	 ,	false, "dbcs",				Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3, 13, 0b0101011011001	 ,	false, "dbne",				Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3, 13, 0b0101011111001	 ,	false, "dbeq",				Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3, 13, 0b0101100011001	 ,	false, "dbvc",				Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3, 13, 0b0101100111001	 ,	false, "dbvs",				Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3, 13, 0b0101101011001	 ,	false, "dbpl",				Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3, 13, 0b0101101111001	 ,	false, "dbmi",				Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3, 13, 0b0101110011001	 ,	false, "dbge",				Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3, 13, 0b0101110111001	 ,	false, "dblt",				Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3, 13, 0b0101111011001	 ,	false, "dbgt",				Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3, 13, 0b0101111111001	 ,	false, "dble",				Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101000011001,			"dbra",				Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101000111001,			"dbf",				 Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101001011001,			"dbhi",				Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101001111001,			"dbls",				Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101010011001,			"dbcc",				Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101010111001,			"dbcs",				Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101011011001,			"dbne",				Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101011111001,			"dbeq",				Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101100011001,			"dbvc",				Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101100111001,			"dbvs",				Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101101011001,			"dbpl",				Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101101111001,			"dbmi",				Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101110011001,			"dbge",				Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101110111001,			"dblt",				Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101111011001,			"dbgt",				Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101111111001,			"dble",				Inst_dbcc ),
 
-	MATCH_ENTRY1_IMPL(6, 10, 0b0101000011	 ,	false, "st",				 Inst_scc ),
-	MATCH_ENTRY1_IMPL(6, 10, 0b0101000111	 ,	false, "sf",				 Inst_scc ),
-	MATCH_ENTRY1_IMPL(6, 10, 0b0101001011	 ,	false, "shi",				Inst_scc ),
-	MATCH_ENTRY1_IMPL(6, 10, 0b0101001111	 ,	false, "sls",				Inst_scc ),
-	MATCH_ENTRY1_IMPL(6, 10, 0b0101010011	 ,	false, "scc",				Inst_scc ),
-	MATCH_ENTRY1_IMPL(6, 10, 0b0101010111	 ,	false, "scs",				Inst_scc ),
-	MATCH_ENTRY1_IMPL(6, 10, 0b0101011011	 ,	false, "sne",				Inst_scc ),
-	MATCH_ENTRY1_IMPL(6, 10, 0b0101011111	 ,	false, "seq",				Inst_scc ),
-	MATCH_ENTRY1_IMPL(6, 10, 0b0101100011	 ,	false, "svc",				Inst_scc ),
-	MATCH_ENTRY1_IMPL(6, 10, 0b0101100111	 ,	false, "svs",				Inst_scc ),
-	MATCH_ENTRY1_IMPL(6, 10, 0b0101101011	 ,	false, "spl",				Inst_scc ),
-	MATCH_ENTRY1_IMPL(6, 10, 0b0101101111	 ,	false, "smi",				Inst_scc ),
-	MATCH_ENTRY1_IMPL(6, 10, 0b0101110011	 ,	false, "sge",				Inst_scc ),
-	MATCH_ENTRY1_IMPL(6, 10, 0b0101110111	 ,	false, "slt",				Inst_scc ),
-	MATCH_ENTRY1_IMPL(6, 10, 0b0101111011	 ,	false, "sgt",				Inst_scc ),
-	MATCH_ENTRY1_IMPL(6, 10, 0b0101111111	 ,	false, "sle",				Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101000011,			"st",				 Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101000111,			"sf",				 Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101001011,			"shi",				Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101001111,			"sls",				Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101010011,			"scc",				Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101010111,			"scs",				Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101011011,			"sne",				Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101011111,			"seq",				Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101100011,			"svc",				Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101100111,			"svs",				Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101101011,			"spl",				Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101101111,			"smi",				Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101110011,			"sge",				Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101110111,			"slt",				Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101111011,			"sgt",				Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101111111,			"sle",				Inst_scc ),
 
-	MATCH_ENTRY2_IMPL(12, 4, 0b0101, 8, 1, 0b1		  ,	false, "subq",			  Inst_subq ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b0101, 8, 1, 0b0		  ,	false, "addq",			  Inst_subq ),
+	MATCH_ENTRY2_IMPL(12,4,0b0101, 8,1,0b1,			"subq",			  Inst_subq ),
+	MATCH_ENTRY2_IMPL(12,4,0b0101, 8,1,0b0,			"addq",			  Inst_subq ),
+	MATCH_ENTRY2_IMPL(12,4,0b0111, 8,1,0b0,			"moveq",			 Inst_moveq ),
 
-	MATCH_ENTRY2_IMPL(12, 4, 0b0111, 8, 1, 0b0	 ,	false, "moveq",			 Inst_moveq ),
+	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b100000,	"sbcd",			  Inst_sbcd_reg ),
+	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b100001,	"sbcd",			  Inst_sbcd_predec ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b100000,	"abcd",			  Inst_sbcd_reg ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b100001,	"abcd",			  Inst_sbcd_predec ),
 
-	MATCH_ENTRY2_IMPL(12, 4, 0b1000, 3, 6, 0b100000	 ,	false, "sbcd",			  Inst_sbcd_reg ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b1000, 3, 6, 0b100001	 ,	false, "sbcd",			  Inst_sbcd_predec ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b1100, 3, 6, 0b100000	 ,	false, "abcd",			  Inst_sbcd_reg ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b1100, 3, 6, 0b100001	 ,	false, "abcd",			  Inst_sbcd_predec ),
+	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,0,	"subx",			  Inst_subx_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,1,	"subx",			  Inst_subx_predec ),
+	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,0,	"addx",			  Inst_subx_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,1,	"addx",			  Inst_subx_predec ),
 
-	MATCH_ENTRY3_IMPL(12, 4, 0b1001, 8, 1, 1, 3, 3, 0 ,	false, "subx",			  Inst_subx_reg ),
-	MATCH_ENTRY3_IMPL(12, 4, 0b1001, 8, 1, 1, 3, 3, 1 ,	false, "subx",			  Inst_subx_predec ),
-	MATCH_ENTRY3_IMPL(12, 4, 0b1101, 8, 1, 1, 3, 3, 0 ,	false, "addx",			  Inst_subx_reg ),
-	MATCH_ENTRY3_IMPL(12, 4, 0b1101, 8, 1, 1, 3, 3, 1 ,	false, "addx",			  Inst_subx_predec ),
-
-	MATCH_ENTRY3_IMPL(12, 4, 0b1011, 8,1,1, 3,3,1 ,		false, "cmpm",			  Inst_cmpm ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b1011, 6,2,3,				false, "cmpa",			  Inst_cmpa ),
+	MATCH_ENTRY3_IMPL(12,4,0b1011, 8,1,1, 3,3,1,	"cmpm",			  Inst_cmpm ),
+	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,2,3,			"cmpa",			  Inst_cmpa ),
 
 	// Nasty case where eor and cmp mirror one another
-	MATCH_ENTRY2_IMPL(12, 4, 0b1011, 6, 3, 0b100		,	false, "eor",			   Inst_eor ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b1011, 6, 3, 0b101		,	false, "eor",			   Inst_eor ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b1011, 6, 3, 0b110		,	false, "eor",			   Inst_eor ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b1100, 6, 3, 0b011		,	false, "mulu",			Inst_muldiv ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b1100, 6, 3, 0b111		,	false, "muls",			Inst_muldiv ),
+	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b100,		"eor",			   Inst_eor ),
+	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b101,		"eor",			   Inst_eor ),
+	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b110,		"eor",			   Inst_eor ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 6,3,0b011,		"mulu",			Inst_muldiv ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 6,3,0b111,		"muls",			Inst_muldiv ),
 
-	MATCH_ENTRY3_IMPL(12, 4, 0b1110, 3, 2, 0, 8, 1, 1 ,	false, "asl",			   Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12, 4, 0b1110, 3, 2, 0, 8, 1, 0 ,	false, "asr",			   Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12, 4, 0b1110, 3, 2, 1, 8, 1, 1 ,	false, "lsl",			   Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12, 4, 0b1110, 3, 2, 1, 8, 1, 0 ,	false, "lsr",			   Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12, 4, 0b1110, 3, 2, 2, 8, 1, 1 ,	false, "roxl",			  Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12, 4, 0b1110, 3, 2, 2, 8, 1, 0 ,	false, "roxr",			  Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12, 4, 0b1110, 3, 2, 3, 8, 1, 1 ,	false, "rol",			   Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12, 4, 0b1110, 3, 2, 3, 8, 1, 0 ,	false, "ror",			   Inst_shift_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,1,	"asl",			   Inst_shift_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,0,	"asr",			   Inst_shift_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,1, 8,1,1,	"lsl",			   Inst_shift_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,1, 8,1,0,	"lsr",			   Inst_shift_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,2, 8,1,1,	"roxl",			  Inst_shift_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,2, 8,1,0,	"roxr",			  Inst_shift_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,1,	"rol",			   Inst_shift_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,0,	"ror",			   Inst_shift_reg ),
 
-	MATCH_ENTRY2_IMPL(12, 4, 0b0100, 6, 3, 0b111   ,	false, "lea",			   Inst_lea ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b1000, 6, 3, 0b011		,	false, "divu",			Inst_muldiv ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b1000, 6, 3, 0b111		,	false, "divs",			Inst_muldiv ),
-	
-	// NOTE: specific case to override CHK since it doesn't support addressing mode 001	
-	MATCH_ENTRY2_IMPL(12, 4, 0b1100, 3, 6, 0b101000	 ,	false, "exg",			   Inst_exg_dd ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b1100, 3, 6, 0b101001	 ,	false, "exg",			   Inst_exg_aa ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b1100, 3, 6, 0b110001	 ,	false, "exg",			   Inst_exg_da ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b0100, 6, 3, 0b110	 ,	false, "chk",			   Inst_chk ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b0100, 6, 3, 0b100		,	false, "chk",			   Inst_chk ),
+	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b111,		"lea",			   Inst_lea ),
+	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b011,		"divu",			Inst_muldiv ),
+	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b111,		"divs",			Inst_muldiv ),
 
-	MATCH_ENTRY2_IMPL(12, 4, 0b1001, 6, 2, 0b11   ,	false, "suba",				Inst_addsuba ),
-	MATCH_ENTRY2_IMPL(12, 4, 0b1101, 6, 2, 0b11   ,	false, "adda",				Inst_addsuba ),
+	// NOTE: specific case to override CHK since it doesn't support addressing mode 001
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101000,	"exg",			   Inst_exg_dd ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101001,	"exg",			   Inst_exg_aa ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b110001,	"exg",			   Inst_exg_da ),
+	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b110,		"chk",			   Inst_chk ),
+	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b100,		"chk",			   Inst_chk ),
+
+	MATCH_ENTRY2_IMPL(12,4,0b1001, 6,2,0b11,		"suba",				Inst_addsuba ),
+	MATCH_ENTRY2_IMPL(12,4,0b1101, 6,2,0b11,		"adda",				Inst_addsuba ),
 
 	// Fallback generics
-	MATCH_ENTRY1_IMPL(12, 4, 0b1011					   ,	false, "cmp",			   Inst_cmp ),
-	
-	// Following where src/dest is d-register 
-	MATCH_ENTRY1_IMPL(12, 4, 0b1000					   ,	false, "or",		   Inst_alu_dreg ),
-	MATCH_ENTRY1_IMPL(12, 4, 0b1001					   ,	false, "sub",		  Inst_alu_dreg ),
-	MATCH_ENTRY1_IMPL(12, 4, 0b1101					   ,	false, "add",		  Inst_alu_dreg ),
-	MATCH_ENTRY1_IMPL(12, 4, 0b1100					   ,	false, "and",		  Inst_alu_dreg ),
+	MATCH_ENTRY1_IMPL(12,4,0b1011,					"cmp",			   Inst_cmp ),
 
-	MATCH_ENTRY2_IMPL(13, 3, 0b001, 6, 3, 0b001		   ,	false, "movea",			 Inst_movea ),
-	MATCH_ENTRY1_IMPL(14, 2, 0b00						 ,	false, "move",			  Inst_move ),
+	// Following where src/dest is d-register
+	MATCH_ENTRY1_IMPL(12,4,0b1000,					"or",		   Inst_alu_dreg ),
+	MATCH_ENTRY1_IMPL(12,4,0b1001,					"sub",		  Inst_alu_dreg ),
+	MATCH_ENTRY1_IMPL(12,4,0b1101,					"add",		  Inst_alu_dreg ),
+	MATCH_ENTRY1_IMPL(12,4,0b1100,					"and",		  Inst_alu_dreg ),
+
+	MATCH_ENTRY2_IMPL(13,3,0b001, 6,3,0b001,		"movea",			 Inst_movea ),
+	MATCH_ENTRY1_IMPL(14,2,0b00,					"move",			  Inst_move ),
 
 	{ 0 }			 // end sentinel
 };
@@ -1570,29 +1568,12 @@ int decode(buffer_reader& buffer, instruction& inst)
 
 	// Make a temp copy of the reader to pass to the decoder, after the first word
 	buffer_reader reader_tmp = buffer;
-
-	if (buffer.get_remain() >= 2)
-	{
-		buffer.read_word(header1);
-		has32 = true;
-	}
-
 	for (const matcher_entry* pEntry = g_matcher_table;
 		pEntry->mask0 != 0;
 		++pEntry)
 	{
-		// Check size first
-		if (pEntry->is32 && !has32)
-			continue;
-
 		// Choose 16 or 32 bits for the check
 		uint32_t header = header0;
-		if (pEntry->is32)
-		{
-			header <<= 16;
-			header |= header1;
-		}
-
 		if ((header & pEntry->mask0) != pEntry->val0)
 			continue;
 
@@ -1689,7 +1670,7 @@ int decode_buf(buffer_reader& buf, const symbols& symbols, disassembly& disasm)
 // ----------------------------------------------------------------------------
 //	INSTRUCTION DISPLAY FORMATTING
 // ----------------------------------------------------------------------------
-static const char* g_reg_names[] = 
+static const char* g_reg_names[] =
 {
 	"d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
 	"a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7"
@@ -2025,7 +2006,7 @@ int process_tos_file(const uint8_t* pData, long size)
 	fprintf(stdout, "Reading text section\n");
 
 	buffer_reader text_buf(buf.get_data(), header.ph_tlen);
-	
+
 	// Skip the text
 	buf.advance(header.ph_tlen);
 	buffer_reader data_buf(buf.get_data(), header.ph_dlen);
