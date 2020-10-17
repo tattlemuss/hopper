@@ -436,8 +436,9 @@ int decode_ea(buffer_reader& buffer, operand& operand, ea_group group, uint8_t m
 	int ea_type = decode_operand_type(mode_bits, reg_bits);
 
 	// TODO Check EA type is valid for this instruction
-	//if self.mode_availability{self.mode][eatype] == false:
-	//		raise ParseException('invalid EA')
+	bool allow = mode_availability[ea_type][group];
+	if (!allow)
+		return 1;
 
 	static const OpType types[] =
 	{
@@ -808,8 +809,7 @@ int Inst_bchg(buffer_reader& buffer, instruction& inst, uint32_t header)
 	uint8_t reg  = (header >> 0) & 7;
 
 	set_dreg(inst.op0, bitreg);
-	decode_ea(buffer, inst.op1, DATA_ALT, mode, reg, Size::BYTE);
-	return 0;
+	return decode_ea(buffer, inst.op1, DATA_ALT, mode, reg, Size::BYTE);
 }
 
 // ----------------------------------------------------------------------------
