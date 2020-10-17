@@ -1845,8 +1845,9 @@ int print(const symbols& symbols, const disassembly& disasm)
 		if (find_symbol(symbols, line.address, sym))
 			printf("%s:\n", sym.label.c_str());
 
-		printf(">> %04x:   $%04x ", line.address, line.inst.header);
-		
+		//printf(">> %04x:   $%04x ", line.address, line.inst.header);
+		printf("\t");
+
 		if (line.inst.tag != NULL)
 			print(line.inst, symbols, line.address, stdout);
 		else
