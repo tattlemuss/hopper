@@ -1263,7 +1263,7 @@ int Inst_chk(buffer_reader& buffer, instruction& inst, uint32_t header)
 	uint8_t size = (header >> 7) & 1;
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	Size ea_size = size ? Size::LONG : Size::WORD;
+	Size ea_size = size ? Size::WORD : Size::LONG;
 	inst.suffix = size_to_suffix(ea_size);
 
 	set_dreg(inst.op1, dreg);
@@ -1526,7 +1526,7 @@ matcher_entry g_matcher_table[] =
 	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101001,	"exg",			   Inst_exg_aa ),
 	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b110001,	"exg",			   Inst_exg_da ),
 	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b110,		"chk",			   Inst_chk ),
-	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b100,		"chk",			   Inst_chk ),
+	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b100,		"chk",			   Inst_chk ),	// not 68000
 
 	MATCH_ENTRY2_IMPL(12,4,0b1001, 6,2,0b11,		"suba",				Inst_addsuba ),
 	MATCH_ENTRY2_IMPL(12,4,0b1101, 6,2,0b11,		"adda",				Inst_addsuba ),
