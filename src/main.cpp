@@ -1608,25 +1608,28 @@ int decode(buffer_reader& buffer, instruction& inst)
 //	INSTRUCTION ANALYSIS
 // ----------------------------------------------------------------------------
 // Check if an instruction jumps to another known address, and return that address
-bool get_jump_target(const instruction& inst, uint32_t inst_address, uint32_t& target_address)
+bool calc_relative_address(const operand& op, uint32_t inst_address, uint32_t& target_address)
 {
-    target_address = 0;
-    if (!inst.tag)
-        return false;
-
-    if ((strcmp(inst.tag, "bra") == 0) ||
-        (strcmp(inst.tag, "bsr") == 0))
+    if (op.type == PC_DISP)
     {
-        // Relative branch
-        assert(inst.op0.type == OpType::PC_DISP);
-        int16_t disp = inst.op0.pc_disp.disp;
+        // Relative
+        int16_t disp = op.pc_disp.disp;
 
         // The base PC is always +2 from the instruction address, since
         // the 68000 has already fetched the header word by then
         target_address = inst_address + 2 + disp;
         return true;
     }
+    else if (op.type == PC_DISP_INDEX)
+    {
+        // Relative
+        int8_t disp = op.pc_disp_index.disp;
 
+        // The base PC is always +2 from the instruction address, since
+        // the 68000 has already fetched the header word by then
+        target_address = inst_address + 2 + disp;
+        return true;
+    }
     return false;
 }
 
@@ -1678,7 +1681,7 @@ static const char* g_reg_names[] =
 };
 
 // ----------------------------------------------------------------------------
-void print(const operand& operand, FILE* pFile)
+void print(const operand& operand, const symbols& symbols, uint32_t inst_address, FILE* pFile)
 {
 	switch (operand.type)
 	{
@@ -1714,18 +1717,49 @@ void print(const operand& operand, FILE* pFile)
 				fprintf(pFile, "$%x.w", operand.absolute_word.wordaddr);
 			return;
 		case OpType::ABSOLUTE_LONG:
-			fprintf(pFile, "$%x.l",
+        {
+            symbol sym;
+            if (find_symbol(symbols, symbol::section_type::TEXT, operand.absolute_long.longaddr, sym))
+    			fprintf(pFile, "%s", sym.label.c_str());
+            else
+			    fprintf(pFile, "$%x.l",
 					operand.absolute_long.longaddr);
 			return;
+        }
 		case OpType::PC_DISP:
-			fprintf(pFile, "%d(pc)", operand.pc_disp.disp);
+        {
+            symbol sym;
+            uint32_t target_address;
+            calc_relative_address(operand, inst_address, target_address);
+            if (find_symbol(symbols, symbol::section_type::TEXT, target_address, sym))
+    			fprintf(pFile, "%s(pc)", sym.label.c_str());
+            else
+    			fprintf(pFile, "$%x(pc)", target_address);
 			return;
+        }
 		case OpType::PC_DISP_INDEX:
-			fprintf(pFile, "%d(pc,d%d.%s)",
-					operand.pc_disp_index.disp,
+        {
+            symbol sym;
+            uint32_t target_address;
+            calc_relative_address(operand, inst_address, target_address);
+
+            if (find_symbol(symbols, symbol::section_type::TEXT, target_address, sym))
+            {
+                fprintf(pFile, "%s(pc,d%d.%s)",
+                        sym.label.c_str(),
+                        operand.pc_disp_index.d_reg,
+                        operand.pc_disp_index.is_long ? "l" : "w");
+            }
+            else
+            {
+            	fprintf(pFile, "$%x(pc,d%d.%s)",
+					target_address,
 					operand.pc_disp_index.d_reg,
 					operand.pc_disp_index.is_long ? "l" : "w");
+
+            }
 			return;
+        }
 		case OpType::MOVEM_REG:
 		{
 			bool first = true;
@@ -1758,7 +1792,7 @@ void print(const operand& operand, FILE* pFile)
 }
 
 // ----------------------------------------------------------------------------
-void print(const instruction& inst, FILE* pFile)
+void print(const instruction& inst, const symbols& symbols, uint32_t inst_address, FILE* pFile)
 {
 	if (!inst.tag)
 	{
@@ -1784,12 +1818,12 @@ void print(const instruction& inst, FILE* pFile)
 	if (inst.op0.type == OpType::INVALID)
 		return;
 	fprintf(pFile, " ");
-	print(inst.op0, pFile);
+	print(inst.op0, symbols, inst_address, pFile);
 
 	if (inst.op1.type == OpType::INVALID)
 		return;
 	fprintf(pFile, ",");
-	print(inst.op1, pFile);
+	print(inst.op1, symbols, inst_address, pFile);
 }
 
 // ----------------------------------------------------------------------------
@@ -1807,18 +1841,9 @@ int print(const symbols& symbols, const disassembly& disasm)
 		printf(">> %04x:   $%04x ", line.address, line.inst.header);
 		
 		if (line.inst.tag != NULL)
-			print(line.inst, stdout);
+			print(line.inst, symbols, line.address, stdout);
 		else
 			printf("dc.w $%x", line.inst.header);
-
-        uint32_t target_pc;
-        if (get_jump_target(line.inst, line.address, target_pc))
-        {
-            printf("\t-> $%x", target_pc);
-            symbol sym2;
-            if (find_symbol(symbols, symbol::section_type::TEXT, target_pc, sym2))
-                printf("\t(%s)", sym2.label.c_str());
-        }
 
 		printf("\n");
 	}
