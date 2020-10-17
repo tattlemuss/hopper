@@ -1544,6 +1544,104 @@ matcher_entry g_matcher_table[] =
 };
 
 // ----------------------------------------------------------------------------
+// decode a single instruction if possible
+int decode(buffer_reader& buffer, instruction& inst)
+{
+	inst.byte_count = 2;	// assume error
+	inst.tag = NULL;
+	inst.suffix = Suffix::NONE;
+
+	// Check remaining size
+	bool has32 = false;
+	uint16_t header0 = 0;
+	uint16_t header1 = 0;
+	uint32_t start_pos = buffer.get_pos();
+
+	if (buffer.get_remain() >= 2)
+	{
+		buffer.read_word(header0);
+		inst.header = header0;
+	}
+
+	// Make a temp copy of the reader to pass to the decoder, after the first word
+	buffer_reader reader_tmp = buffer;
+
+	if (buffer.get_remain() >= 2)
+	{
+		buffer.read_word(header1);
+		has32 = true;
+	}
+
+	for (const matcher_entry* pEntry = g_matcher_table;
+		pEntry->mask0 != 0;
+		++pEntry)
+	{
+		// Check size first
+		if (pEntry->is32 && !has32)
+			continue;
+
+		// Choose 16 or 32 bits for the check
+		uint32_t header = header0;
+		if (pEntry->is32)
+		{
+			header <<= 16;
+			header |= header1;
+		}
+
+		if ((header & pEntry->mask0) != pEntry->val0)
+			continue;
+
+		// Do specialised decoding
+		inst.tag = pEntry->tag;
+		int res = 0;
+		if (pEntry->func)
+			res = pEntry->func(reader_tmp, inst, header);
+		inst.byte_count = reader_tmp.get_pos() - start_pos;
+		return res;
+	}
+
+	// no match found
+	return 1;
+}
+
+// ----------------------------------------------------------------------------
+//	HIGHER-LEVEL DISASSEMBLY CREATION
+// ----------------------------------------------------------------------------
+// Storage for an attempt at tokenising the memory
+class disassembly
+{
+public:
+    struct line
+    {
+        uint32_t    address;
+        instruction inst;
+    };
+
+    std::vector<line>    lines;
+};
+
+int decode_buf(buffer_reader& buf, const symbols& symbols, disassembly& disasm)
+{
+	while (buf.get_remain() >= 2)
+	{
+        disassembly::line line;
+        line.address = buf.get_pos();
+
+        // decode uses a copy of the buffer state
+		buffer_reader buf_copy(buf);
+		int res = decode(buf_copy, line.inst);
+
+        // Handle failure
+		if (res != 0)
+            line.inst.tag = NULL;
+        disasm.lines.push_back(line);
+
+        buf.advance(line.inst.byte_count);
+	}
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
 //	INSTRUCTION DISPLAY FORMATTING
 // ----------------------------------------------------------------------------
 static const char* g_reg_names[] = 
@@ -1666,94 +1764,26 @@ void print(const instruction& inst, FILE* pFile)
 	fprintf(pFile, ",");
 	print(inst.op1, pFile);
 }
+
 // ----------------------------------------------------------------------------
-// decode a single instruction if possible
-int decode(buffer_reader& buffer, instruction& inst)
+int print(const symbols& symbols, const disassembly& disasm)
 {
-	inst.byte_count = 2;	// assume error
-	inst.tag = NULL;
-	inst.suffix = Suffix::NONE;
-
-	// Check remaining size
-	bool has32 = false;
-	uint16_t header0 = 0;
-	uint16_t header1 = 0;
-	uint32_t start_pos = buffer.get_pos();
-
-	if (buffer.get_remain() >= 2)
+    for (size_t i = 0; i < disasm.lines.size(); ++i)
 	{
-		buffer.read_word(header0);
-		inst.header = header0;
-	}
+        const disassembly::line& line = disasm.lines[i];
 
-	// Make a temp copy of the reader to pass to the decoder, after the first word
-	buffer_reader reader_tmp = buffer;
-
-	if (buffer.get_remain() >= 2)
-	{
-		buffer.read_word(header1);
-		has32 = true;
-	}
-
-	for (const matcher_entry* pEntry = g_matcher_table;
-		pEntry->mask0 != 0;
-		++pEntry)
-	{
-		// Check size first
-		if (pEntry->is32 && !has32)
-			continue;
-
-		// Choose 16 or 32 bits for the check
-		uint32_t header = header0;
-		if (pEntry->is32)
-		{
-			header <<= 16;
-			header |= header1;
-		}
-
-		if ((header & pEntry->mask0) != pEntry->val0)
-			continue;
-
-		// Do specialised decoding
-		inst.tag = pEntry->tag;
-		int res = 0;
-		if (pEntry->func)
-			res = pEntry->func(reader_tmp, inst, header);
-		inst.byte_count = reader_tmp.get_pos() - start_pos;
-		return res;
-	}
-
-	// no match found
-	return 1;
-}
-
-int decode_buf(buffer_reader& buf, const symbols& symbols)
-{
-	while (buf.get_remain() >= 2)
-	{
 		// TODO very naive label check
 		symbol sym;
-		if (find_symbol(symbols, symbol::section_type::TEXT, buf.get_pos(), sym))
+		if (find_symbol(symbols, symbol::section_type::TEXT, line.address, sym))
 			printf("%s:\n", sym.label.c_str());
 
-		buffer_reader buf_copy2(buf);
-		uint16_t tmp = 0;
-		buf_copy2.read_word(tmp);
-		printf(">> %04x:   $%04x ", buf.get_pos(), tmp);
+		printf(">> %04x:   $%04x ", line.address, line.inst.header);
 		
-		buffer_reader buf_copy = buf;
-
-		instruction inst;
-		int res = decode(buf_copy, inst);
-
-		if (res == 0)
-			print(inst, stdout);
+		if (line.inst.tag != NULL)
+			print(line.inst, stdout);
 		else
-			printf("dc.w $%x", inst.header);
+			printf("dc.w $%x", line.inst.header);
 		printf("\n");
-		
-		// Move to next
-		buf.advance(inst.byte_count);
 	}
 	return 0;
 }
@@ -1876,7 +1906,12 @@ int process_tos_file(const uint8_t* pData, long size)
 
 	int ret = read_symbols(symbol_buf, exe_symbols);
 
-	return decode_buf(text_buf, exe_symbols);
+    disassembly disasm;
+    if (decode_buf(text_buf, exe_symbols, disasm))
+        return 1;
+
+    print(exe_symbols, disasm);
+    return 0;
 }
 
 // ----------------------------------------------------------------------------
