@@ -102,7 +102,7 @@ struct symbol
 	std::string		label;
 	section_type	section;
 	// TODO section, flags.
-	uint32_t		address;	
+	uint32_t		address;		// Address with section start factored in, so global across the executable
 };
 
 class symbols
@@ -111,13 +111,12 @@ public:
 	std::vector<symbol>		table;
 };
 
-bool find_symbol(const symbols& symbols, symbol::section_type section, uint32_t address, symbol& result)
+bool find_symbol(const symbols& symbols, uint32_t address, symbol& result)
 {
 	for (size_t i = 0; i < symbols.table.size(); ++i)
 	{
 		const symbol& sym = symbols.table[i];
-		if (sym.section == section &&
-			sym.address == address)
+		if (sym.address == address)
 		{
 			result = sym;
 			return true;
@@ -1719,7 +1718,7 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 		case OpType::ABSOLUTE_LONG:
 		{
 			symbol sym;
-			if (find_symbol(symbols, symbol::section_type::TEXT, operand.absolute_long.longaddr, sym))
+			if (find_symbol(symbols, operand.absolute_long.longaddr, sym))
 				fprintf(pFile, "%s", sym.label.c_str());
 			else
 				fprintf(pFile, "$%x.l",
@@ -1731,7 +1730,7 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 			symbol sym;
 			uint32_t target_address;
 			calc_relative_address(operand, inst_address, target_address);
-			if (find_symbol(symbols, symbol::section_type::TEXT, target_address, sym))
+			if (find_symbol(symbols, target_address, sym))
 				fprintf(pFile, "%s(pc)", sym.label.c_str());
 			else
 				fprintf(pFile, "$%x(pc)", target_address);
@@ -1743,7 +1742,7 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 			uint32_t target_address;
 			calc_relative_address(operand, inst_address, target_address);
 
-			if (find_symbol(symbols, symbol::section_type::TEXT, target_address, sym))
+			if (find_symbol(symbols, target_address, sym))
 			{
 				fprintf(pFile, "%s(pc,d%d.%s)",
 						sym.label.c_str(),
@@ -1835,7 +1834,7 @@ int print(const symbols& symbols, const disassembly& disasm)
 
 		// TODO very naive label check
 		symbol sym;
-		if (find_symbol(symbols, symbol::section_type::TEXT, line.address, sym))
+		if (find_symbol(symbols, line.address, sym))
 			printf("%s:\n", sym.label.c_str());
 
 		printf(">> %04x:   $%04x ", line.address, line.inst.header);
@@ -1850,7 +1849,9 @@ int print(const symbols& symbols, const disassembly& disasm)
 	return 0;
 }
 
-
+// ----------------------------------------------------------------------------
+// Find addresses referenced by disasm instructions and add them to the
+// symbol table
 void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 {
 	uint32_t label_id = 0;
@@ -1862,7 +1863,7 @@ void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 		if (calc_relative_address(line.inst.op0, line.address, target_address))
 		{
 			symbol sym;
-			if (!find_symbol(symbols, symbol::section_type::TEXT, target_address, sym))
+			if (!find_symbol(symbols, target_address, sym))
 			{
 				sym.address = target_address;
 				sym.section = symbol::section_type::TEXT;
@@ -1874,7 +1875,7 @@ void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 		if (calc_relative_address(line.inst.op1, line.address, target_address))
 		{
 			symbol sym;
-			if (!find_symbol(symbols, symbol::section_type::TEXT, target_address, sym))
+			if (!find_symbol(symbols, target_address, sym))
 			{
 				sym.address = target_address;
 				sym.section = symbol::section_type::TEXT;
@@ -1889,6 +1890,25 @@ void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 }
 
 // ----------------------------------------------------------------------------
+//	TOS EXECUTABLE READING
+// ----------------------------------------------------------------------------
+struct tos_header
+{
+   //  See http://toshyp.atari.org/en/005005.html for TOS header details
+	uint16_t  ph_branch;	  /* Branch to start of the program  */
+							  /* (must be 0x601a!)			   */
+
+	uint32_t  ph_tlen;		  /* Length of the TEXT segment	  */
+	uint32_t  ph_dlen;		  /* Length of the DATA segment	  */
+	uint32_t  ph_blen;		  /* Length of the BSS segment	   */
+	uint32_t  ph_slen;		  /* Length of the symbol table	  */
+	uint32_t  ph_res1;		  /* Reserved, should be 0;		  */
+							  /* Required by PureC			   */
+	uint32_t  ph_prgflags;	  /* Program flags				   */
+	uint16_t  ph_absflag;	  /* 0 = Relocation info present	 */
+};
+
+// ----------------------------------------------------------------------------
 //	DRI SYMBOL READING
 // ----------------------------------------------------------------------------
 static const int DRI_TABLE_SIZE = 14;
@@ -1897,8 +1917,13 @@ static const uint16_t DRI_SECT_TEXT = 0x0200;
 static const uint16_t DRI_SECT_DATA = 0x0400;
 static const uint16_t DRI_SECT_BSS  = 0x0100;
 
-int read_symbols(buffer_reader& buf, symbols& symbols)
+int read_symbols(buffer_reader& buf, const tos_header& header, symbols& symbols)
 {
+	// Calculate text, data and bss addresses
+	uint32_t text_address = 0;
+	uint32_t data_address = text_address + header.ph_tlen;
+	uint32_t bss_address  = data_address + header.ph_dlen;
+
 	while (buf.get_remain() >= DRI_TABLE_SIZE)
 	{
 		uint8_t name[8 + 14 + 1];
@@ -1927,39 +1952,21 @@ int read_symbols(buffer_reader& buf, symbols& symbols)
 		sym.address = symbol_address;
 		sym.section = symbol::section_type::UNKNOWN;
 
-		// Parse the flags to work out which section
+		// Parse the flags to work out which section, then resolve an address
 		switch (symbol_id & 0xf00)
 		{
-			case DRI_SECT_TEXT: sym.section = symbol::section_type::TEXT; break;
-			case DRI_SECT_DATA: sym.section = symbol::section_type::DATA; break;
-			case DRI_SECT_BSS:  sym.section = symbol::section_type::BSS; break;
+			case DRI_SECT_TEXT: sym.section = symbol::section_type::TEXT; sym.address += text_address; break;
+			case DRI_SECT_DATA: sym.section = symbol::section_type::DATA; sym.address += data_address; break;
+			case DRI_SECT_BSS:  sym.section = symbol::section_type::BSS;  sym.address += bss_address;  break;
 			default:
 				break;
 		}
-		symbols.table.push_back(sym);
+		if (sym.section != symbol::section_type::UNKNOWN)
+			symbols.table.push_back(sym);
 	}
 
 	return 0;
 }
-
-// ----------------------------------------------------------------------------
-//	TOS EXECUTABLE READING
-// ----------------------------------------------------------------------------
-struct tos_header
-{
-   //  See http://toshyp.atari.org/en/005005.html for TOS header details
-	uint16_t  ph_branch;	  /* Branch to start of the program  */
-							  /* (must be 0x601a!)			   */
-
-	uint32_t  ph_tlen;		  /* Length of the TEXT segment	  */
-	uint32_t  ph_dlen;		  /* Length of the DATA segment	  */
-	uint32_t  ph_blen;		  /* Length of the BSS segment	   */
-	uint32_t  ph_slen;		  /* Length of the symbol table	  */
-	uint32_t  ph_res1;		  /* Reserved, should be 0;		  */
-							  /* Required by PureC			   */
-	uint32_t  ph_prgflags;	  /* Program flags				   */
-	uint16_t  ph_absflag;	  /* 0 = Relocation info present	 */
-};
 
 // ----------------------------------------------------------------------------
 int process_tos_file(const uint8_t* pData, long size)
@@ -2004,7 +2011,7 @@ int process_tos_file(const uint8_t* pData, long size)
 
 	symbols exe_symbols;
 
-	int ret = read_symbols(symbol_buf, exe_symbols);
+	int ret = read_symbols(symbol_buf, header, exe_symbols);
 
 	disassembly disasm;
 	if (decode_buf(text_buf, exe_symbols, disasm))
