@@ -21,9 +21,11 @@
 	move	sr,4(a7,d7.l)
 	nbcd	(a1)+
 	pea	4(a7)
-    pea $1234.w
-    pea $0cafebad
-    pea (a0)
+	pea $1234.w
+	pea $0cafebad
+	pea (a0)
+	lea 1235(a0),a7
+	lea -35(a6,d7.w),a7
 	tas	3(a7,d7.w)
 	jsr	(a3)
     jsr label
