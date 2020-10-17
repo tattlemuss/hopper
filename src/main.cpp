@@ -667,7 +667,7 @@ int Inst_movem_mem_reg(buffer_reader& buffer, instruction& inst, uint32_t header
 	// dst register
 	inst.op1.type = OpType::MOVEM_REG;
 	inst.op1.movem_reg.reg_mask = reg_mask;
-	return decode_ea(buffer, inst.op0, CONTROL_MOVEM1, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op0, CONTROL_MOVEM2, mode, reg, ea_size);
 }
 
 // ----------------------------------------------------------------------------
