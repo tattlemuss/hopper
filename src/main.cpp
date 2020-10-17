@@ -473,6 +473,10 @@ int decode_ea(buffer_reader& buffer, operand& operand, ea_group group, uint8_t m
 			return 0;
 
 		case OpType::A_DIRECT:
+			// Special case: address register direct never allowed with byte
+			// operations.
+			if (size == Size::BYTE)
+				return 1;
 			operand.a_register.reg = reg_bits;
 			return 0;
 
@@ -2054,7 +2058,6 @@ int main(int argc, char** argv)
 
 	uint8_t* pData = (uint8_t*) malloc(size);
 	int readBytes = fread(pData, 1, size, pInfile);
-	printf("Read %d bytes\n", readBytes);
 	fclose(pInfile);
 
 	return process_tos_file(pData, size);
