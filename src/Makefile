@@ -1,14 +1,23 @@
+CC=clang #g++
+LD=clang #g++
+
 SRC_PATH=.
 OUT_PATH=./bin/hopper
-CPP_SRC=$(wildcard ${SRC_PATH}/*.cpp)
-CPP_BIN= $(CPP_SRC:${SRC_PATH}/%.cpp=${OUT_PATH}/%)
-CC=g++
+CPP_SRC=./main.cpp
+
+CPP_OBJ=$(CPP_SRC:${SRC_PATH}/%.cpp=${SRC_PATH}/%.o)
 CFLAGS=-I${SRC_PATH}/lib -DDEBUG -std=c++11
+LDFLAGS=-lstdc++
 
-all: $(OUT_PATH)
+%.o: %.cpp
+	${CC} ${CFLAGS} -c -o $@ $^
 
-${OUT_PATH}: ${CPP_SRC}
-	${CC} ${CFLAGS} $^ -g -o $@
+# Final exe
+${OUT_PATH}: ${CPP_OBJ}
+	${LD} ${LDFLAGS} $^ -g -o $@
 
 clean:
+	@rm -rf *.o
 	@rm -rf ${OUT_PATH}
+
+all: $(OUT_PATH)
