@@ -566,6 +566,7 @@ Suffix size_to_suffix(Size size)
 		case Size::BYTE: return Suffix::BYTE;
 		case Size::WORD: return Suffix::WORD;
 		case Size::LONG: return Suffix::LONG;
+		default: break;
 	}
 	return Suffix::NONE;
 }
@@ -1046,7 +1047,7 @@ int Inst_branch(buffer_reader& buffer, instruction& inst, uint32_t header)
 int Inst_ext(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	// NOTE: this needs to be changed if handling ext byte->long
-	uint8_t mode = (header >> 6) && 1;
+	uint8_t mode = (header >> 6) & 1;
 	inst.suffix = (mode == 0) ? Suffix::WORD : Suffix::LONG;
 	uint8_t reg = (header >> 0) & 7;
 	set_dreg(inst.op0, reg);
