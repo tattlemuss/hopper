@@ -8,46 +8,7 @@
 #include "buffer.h"
 #include "decode.h"
 #include "instruction.h"
-
-// ----------------------------------------------------------------------------
-//	SYMBOL STORAGE
-// ----------------------------------------------------------------------------
-struct symbol
-{
-	enum section_type
-	{
-		TEXT,
-		DATA,
-		BSS,
-		UNKNOWN			// placeholder for unexpected symbols
-	};
-
-	std::string		label;
-	section_type	section;
-	// TODO section, flags.
-	uint32_t		address;		// Address with section start factored in, so global across the executable
-};
-
-class symbols
-{
-public:
-	std::vector<symbol>		table;
-};
-
-bool find_symbol(const symbols& symbols, uint32_t address, symbol& result)
-{
-	for (size_t i = 0; i < symbols.table.size(); ++i)
-	{
-		const symbol& sym = symbols.table[i];
-		if (sym.address == address)
-		{
-			result = sym;
-			return true;
-		}
-	}
-	return false;
-}
-
+#include "symbols.h"
 
 // ----------------------------------------------------------------------------
 //	INSTRUCTION ANALYSIS
