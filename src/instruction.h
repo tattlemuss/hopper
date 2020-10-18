@@ -6,6 +6,130 @@
 // ----------------------------------------------------------------------------
 //	INSTRUCTION STORAGE
 // ----------------------------------------------------------------------------
+enum Opcode
+{
+	NONE,
+	ABCD,
+	ADD,
+	ADDA,
+	ADDI,
+	ADDQ,
+	ADDX,
+	AND,
+	ANDI,
+	ASL,
+	ASR,
+	BCC,
+	BCHG,
+	BCLR,
+	BCS,
+	BEQ,
+	BGE,
+	BGT,
+	BHI,
+	BLE,
+	BLS,
+	BLT,
+	BMI,
+	BNE,
+	BPL,
+	BRA,
+	BSET,
+	BSR,
+	BTST,
+	BVC,
+	BVS,
+	CHK,
+	CLR,
+	CMP,
+	CMPI,
+	CMPA,
+	CMPM,
+	DBCC,
+	DBCS,
+	DBEQ,
+	DBF,
+	DBGE,
+	DBGT,
+	DBHI,
+	DBLE,
+	DBLS,
+	DBLT,
+	DBMI,
+	DBNE,
+	DBPL,
+	DBRA,
+	DBVC,
+	DBVS,
+	DIVS,
+	DIVU,
+	EOR,
+	EORI,
+	EXG,
+	EXT,
+	ILLEGAL,
+	JMP,
+	JSR,
+	LEA,
+	LINK,
+	LSL,
+	LSR,
+	MOVE,
+	MOVEA,
+	MOVEM,
+	MOVEP,
+	MOVEQ,
+	MULS,
+	MULU,
+	NBCD,
+	NEG,
+	NEGX,
+	NOP,
+	NOT,
+	OR,
+	ORI,
+	PEA,
+	RESET,
+	ROL,
+	ROR,
+	ROXL,
+	ROXR,
+	RTE,
+	RTR,
+	RTS,
+	SBCD,
+	SCC,
+	SCS,
+	SEQ,
+	SF,
+	SGE,
+	SGT,
+	SHI,
+	SLE,
+	SLS,
+	SLT,
+	SMI,
+	SNE,
+	SPL,
+	ST,
+	STOP,
+	SUB,
+	SUBA,
+	SUBI,
+	SUBQ,
+	SUBX,
+	SVC,
+	SVS,
+	SWAP,
+	TAS,
+	TRAP,
+	TRAPV,
+	TST,
+	UNLK,
+
+	COUNT	// Used for array sizes
+};
+
 enum class Size
 {
 	BYTE,
@@ -35,7 +159,7 @@ enum OpType
 	// Specific registers
 	SR,
 	USP,
-	CCR
+	CCR,
 };
 
 // ----------------------------------------------------------------------------
@@ -55,7 +179,7 @@ struct operand
 	{
 		struct
 		{
-			Size		size;
+			Size		size;		// byte, word or long
 			uint32_t	val0;
 		} imm;
 
@@ -133,7 +257,7 @@ struct operand
 	};
 };
 
-enum Suffix
+enum class Suffix
 {
 	BYTE,
 	WORD,
@@ -149,15 +273,15 @@ struct instruction
 	instruction() :
 		header(0U),
 		byte_count(0U),
-		suffix(NONE),
-		tag(NULL)
+		opcode(Opcode::NONE),
+		suffix(Suffix::BYTE)
 	{
 	}
 
 	uint16_t	header;			// first 16-bit word of data
 	uint16_t	byte_count;
+	Opcode		opcode;
 	Suffix		suffix;
-	const char*	tag;			// TODO replace with instruction enum
 	operand		op0;
 	operand		op1;
 };

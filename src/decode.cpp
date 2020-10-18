@@ -57,7 +57,7 @@ void set_postinc(operand& op, uint8_t reg)
 // Effective Address encoding modes.
 // Different instructions have different sets of EAs which are allowable to be used
 // for each operand. This ID flags which ones are allowed.
-enum ea_group
+enum class ea_group
 {
 	DATA_ALT		= 0,	// Data alterable (no A-reg, no PC-rel, no immedidate)
 	DATA			= 1,	// Data, non-alterable (source)
@@ -72,7 +72,7 @@ enum ea_group
 };
 
 // Defines which instruction modes are allowed to have which EA modes
-bool mode_availability[][ea_group::COUNT] =
+bool mode_availability[][(int)ea_group::COUNT] =
 {
 	// DataAlt	Data	MemAlt	Mem		Ctrl	CMovem	CMovem2	Alt		All
 	{	true,	true,	false,	false,	false,	false,	false,	true,	true	}, // D_DIRECT			000 regno
@@ -157,7 +157,7 @@ int decode_ea(buffer_reader& buffer, operand& operand, ea_group group, uint8_t m
 	int ea_type = decode_operand_type(mode_bits, reg_bits);
 
 	// Check EA type is valid for this instruction
-	bool allow = mode_availability[ea_type][group];
+	bool allow = mode_availability[ea_type][(int)group];
 	if (!allow)
 		return 1;
 
@@ -310,7 +310,7 @@ int Inst_integer_imm_ea(buffer_reader& buffer, instruction& inst, uint32_t heade
 	// op1: EA
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, inst.op1, DATA_ALT, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op1, ea_group::DATA_ALT, mode, reg, ea_size);
 }
 
 // ----------------------------------------------------------------------------
@@ -327,7 +327,7 @@ int Inst_size_ea(buffer_reader& buffer, instruction& inst, uint32_t header)
 	if (ea_size == Size::NONE)
 		return 1;
 
-	return decode_ea(buffer, inst.op0, DATA_ALT, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op0, ea_group::DATA_ALT, mode, reg, ea_size);
 }
 
 // ----------------------------------------------------------------------------
@@ -342,7 +342,7 @@ int Inst_lea(buffer_reader& buffer, instruction& inst, uint32_t header)
 	inst.op1.type = OpType::A_DIRECT;
 	inst.op1.a_register.reg = dest_reg;
 
-	return decode_ea(buffer, inst.op0, CONTROL, mode, reg, Size::LONG);
+	return decode_ea(buffer, inst.op0, ea_group::CONTROL, mode, reg, Size::LONG);
 }
 
 // ----------------------------------------------------------------------------
@@ -360,7 +360,7 @@ int Inst_movem_reg_mem(buffer_reader& buffer, instruction& inst, uint32_t header
 	// src register
 	inst.op0.type = OpType::MOVEM_REG;
 	inst.op0.movem_reg.reg_mask = reg_mask;
-	if (decode_ea(buffer, inst.op1, CONTROL_MOVEM1, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op1, ea_group::CONTROL_MOVEM1, mode, reg, ea_size))
 		return 1;
 
 	// Special case: if we are -(a0) mode, order of registers is reversed
@@ -392,7 +392,7 @@ int Inst_movem_mem_reg(buffer_reader& buffer, instruction& inst, uint32_t header
 	// dst register
 	inst.op1.type = OpType::MOVEM_REG;
 	inst.op1.movem_reg.reg_mask = reg_mask;
-	return decode_ea(buffer, inst.op0, CONTROL_MOVEM2, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op0, ea_group::CONTROL_MOVEM2, mode, reg, ea_size);
 }
 
 // ----------------------------------------------------------------------------
@@ -433,7 +433,7 @@ int Inst_movea(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 	inst.suffix = size_to_suffix(ea_size);
 
-	if (decode_ea(buffer, inst.op0, ALL, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op0, ea_group::ALL, mode, reg, ea_size))
 		return 1;
 
 	inst.op1.type = OpType::A_DIRECT;
@@ -470,7 +470,7 @@ int Inst_subq(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 
 	inst.suffix = size_to_suffix(ea_size);
-	return decode_ea(buffer, inst.op1, ALT, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op1, ea_group::ALT, mode, reg, ea_size);
 }
 
 // ----------------------------------------------------------------------------
@@ -488,7 +488,7 @@ int Inst_move_from_sr(buffer_reader& buffer, instruction& inst, uint32_t header)
 
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, inst.op1, DATA, mode, reg, Size::WORD);
+	return decode_ea(buffer, inst.op1, ea_group::DATA, mode, reg, Size::WORD);
 }
 
 // ----------------------------------------------------------------------------
@@ -499,7 +499,7 @@ int Inst_move_to_sr(buffer_reader& buffer, instruction& inst, uint32_t header)
 
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, inst.op0, DATA, mode, reg, Size::WORD);
+	return decode_ea(buffer, inst.op0, ea_group::DATA, mode, reg, Size::WORD);
 }
 
 // ----------------------------------------------------------------------------
@@ -517,7 +517,7 @@ int Inst_bchg_imm(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 
 	set_imm_byte(inst.op0, (imm >> 0) & 0xff);
-	if (decode_ea(buffer, inst.op1, DATA_ALT, mode, reg, Size::NONE))
+	if (decode_ea(buffer, inst.op1, ea_group::DATA_ALT, mode, reg, Size::NONE))
 		return 1;
 
 	// instruction size is LONG when using DREG.
@@ -534,7 +534,7 @@ int Inst_bchg(buffer_reader& buffer, instruction& inst, uint32_t header)
 	uint8_t reg  = (header >> 0) & 7;
 
 	set_dreg(inst.op0, bitreg);
-	return decode_ea(buffer, inst.op1, DATA_ALT, mode, reg, Size::BYTE);
+	return decode_ea(buffer, inst.op1, ea_group::DATA_ALT, mode, reg, Size::BYTE);
 }
 
 // ----------------------------------------------------------------------------
@@ -557,14 +557,14 @@ int Inst_alu_dreg(buffer_reader& buffer, instruction& inst, uint32_t header)
 		// Src is d-reg
 		inst.op0.type = OpType::D_DIRECT;
 		inst.op0.d_register.reg = dreg;
-		return decode_ea(buffer, inst.op1, MEM_ALT, mode, reg, ea_size);
+		return decode_ea(buffer, inst.op1, ea_group::MEM_ALT, mode, reg, ea_size);
 	}
 	else
 	{
 		// Dest is d-reg
 		inst.op1.type = OpType::D_DIRECT;
 		inst.op1.d_register.reg = dreg;
-		return decode_ea(buffer, inst.op0, ALL, mode, reg, ea_size);
+		return decode_ea(buffer, inst.op0, ea_group::ALL, mode, reg, ea_size);
 	}
 }
 
@@ -584,7 +584,7 @@ int Inst_addsuba(buffer_reader& buffer, instruction& inst, uint32_t header)
 
 	inst.op1.type = OpType::A_DIRECT;
 	inst.op1.a_register.reg = areg;
-	return decode_ea(buffer, inst.op0, ALL, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op0, ea_group::ALL, mode, reg, ea_size);
 }
 
 // ----------------------------------------------------------------------------
@@ -692,7 +692,7 @@ int Inst_move_to_ccr(buffer_reader& buffer, instruction& inst, uint32_t header)
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
 	inst.op1.type = OpType::CCR;
-	return decode_ea(buffer, inst.op0, DATA, mode, reg, Size::WORD);
+	return decode_ea(buffer, inst.op0, ea_group::DATA, mode, reg, Size::WORD);
 }
 
 // ----------------------------------------------------------------------------
@@ -701,7 +701,7 @@ int Inst_nbcd(buffer_reader& buffer, instruction& inst, uint32_t header)
 	inst.suffix = Suffix::BYTE;
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, inst.op0, DATA_ALT, mode, reg, Size::BYTE);
+	return decode_ea(buffer, inst.op0, ea_group::DATA_ALT, mode, reg, Size::BYTE);
 }
 
 // ----------------------------------------------------------------------------
@@ -709,7 +709,7 @@ int Inst_pea(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, inst.op0, CONTROL, mode, reg, Size::LONG);
+	return decode_ea(buffer, inst.op0, ea_group::CONTROL, mode, reg, Size::LONG);
 }
 
 // ----------------------------------------------------------------------------
@@ -718,7 +718,7 @@ int Inst_tas(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, inst.op0, DATA_ALT, mode, reg, Size::BYTE);
+	return decode_ea(buffer, inst.op0, ea_group::DATA_ALT, mode, reg, Size::BYTE);
 }
 
 // ----------------------------------------------------------------------------
@@ -727,7 +727,7 @@ int Inst_jump(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, inst.op0, CONTROL, mode, reg, Size::NONE);
+	return decode_ea(buffer, inst.op0, ea_group::CONTROL, mode, reg, Size::NONE);
 }
 
 // ----------------------------------------------------------------------------
@@ -738,7 +738,7 @@ int Inst_asl_asr_mem(buffer_reader& buffer, instruction& inst, uint32_t header)
 	uint8_t reg  = (header >> 0) & 7;
 	// "An operand in memory can be shifted one bit only, and the operand size is restricted to a word."
 	inst.suffix = Suffix::WORD;
-	return decode_ea(buffer, inst.op0, MEM_ALT, mode, reg, Size::WORD);
+	return decode_ea(buffer, inst.op0, ea_group::MEM_ALT, mode, reg, Size::WORD);
 }
 
 // ----------------------------------------------------------------------------
@@ -833,7 +833,7 @@ int Inst_scc(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, inst.op0, DATA_ALT, mode, reg, Size::BYTE);
+	return decode_ea(buffer, inst.op0, ea_group::DATA_ALT, mode, reg, Size::BYTE);
 }
 
 // ----------------------------------------------------------------------------
@@ -916,7 +916,7 @@ int Inst_cmpa(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 	inst.suffix = size_to_suffix(ea_size);
 
-	if (decode_ea(buffer, inst.op0, ALL, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op0, ea_group::ALL, mode, reg, ea_size))
 		return 1;
 	set_areg(inst.op1, areg);
 	return 0;
@@ -934,7 +934,7 @@ int Inst_cmp(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 	inst.suffix = size_to_suffix(ea_size);
 
-	if (decode_ea(buffer, inst.op0, ALL, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op0, ea_group::ALL, mode, reg, ea_size))
 		return 1;
 	set_dreg(inst.op1, dreg);
 	return 0;
@@ -956,7 +956,7 @@ int Inst_eor(buffer_reader& buffer, instruction& inst, uint32_t header)
 	set_dreg(inst.op0, dreg);
 
 	// dest is EA
-	if (decode_ea(buffer, inst.op1, DATA_ALT, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op1, ea_group::DATA_ALT, mode, reg, ea_size))
 		return 1;
 	return 0;
 }
@@ -973,7 +973,7 @@ int Inst_muldiv(buffer_reader& buffer, instruction& inst, uint32_t header)
 	inst.suffix = Suffix::WORD;
 
 	// src is EA
-	if (decode_ea(buffer, inst.op0, DATA, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op0, ea_group::DATA, mode, reg, ea_size))
 		return 1;
 
 	// dst is d-reg
@@ -992,7 +992,7 @@ int Inst_chk(buffer_reader& buffer, instruction& inst, uint32_t header)
 	inst.suffix = size_to_suffix(ea_size);
 
 	set_dreg(inst.op1, dreg);
-	return decode_ea(buffer, inst.op0, DATA, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op0, ea_group::DATA, mode, reg, ea_size);
 }
 
 // ----------------------------------------------------------------------------
@@ -1069,203 +1069,203 @@ struct matcher_entry
 {
 	uint32_t		mask0;
 	uint32_t		val0;
-	const char*		tag;
+	Opcode			opcode;
 	pfnDecoderFunc	func;
 };
 
 #define MATCH_ENTRY1_IMPL(shift, bitcount, val, tag, func)   \
-	{ (((1U<<(bitcount))-1U)<<(shift)), (val<<(shift)), tag, func }
+	{ (((1U<<(bitcount))-1U)<<(shift)), (val<<(shift)), Opcode::tag, func }
 
 #define MATCH_ENTRY2_IMPL(shift, bitcount, val, shift2, bitcount2, val2, tag, func)   \
 	{ (((1U<<(bitcount))-1U)<<(shift)) | (((1U<<(bitcount2))-1U)<<(shift2)), \
 		(val<<(shift)) | (val2<<(shift2)), \
-	   tag, func }
+	   Opcode::tag, func }
 
 #define MATCH_ENTRY3_IMPL(shift, bitcount, val, shift2, bitcount2, val2, shift3, bitcount3, val3, tag, func)   \
 	{ (((1U<<(bitcount))-1U)<<(shift)) | (((1U<<(bitcount2))-1U)<<(shift2))  | (((1U<<(bitcount3))-1U)<<(shift3)), \
 		(val<<(shift)) | (val2<<(shift2)) | (val3<<(shift3)), \
-	   tag, func }
+	   Opcode::tag, func }
 
 matcher_entry g_matcher_table[] =
 {
 	//		          SH CT							Tag				  Decoder
-	MATCH_ENTRY1_IMPL(0,16,0b0000101001111100,		"eori",		Inst_imm_sr ), // supervisor
-	MATCH_ENTRY1_IMPL(0,16,0b0000001000111100,		"andi",		Inst_imm_ccr ),
-	MATCH_ENTRY1_IMPL(0,16,0b0000101000111100,		"eori",		Inst_imm_ccr ),
-	MATCH_ENTRY1_IMPL(0,16,0b0000000000111100,		"ori",		Inst_imm_ccr ),
-	MATCH_ENTRY1_IMPL(0,16,0b0000000001111100,		"ori",		Inst_imm_sr ), // supervisor
-	MATCH_ENTRY1_IMPL(0,16,0b0000001001111100,		"andi",		Inst_imm_sr ), // supervisor
+	MATCH_ENTRY1_IMPL(0,16,0b0000101001111100,		EORI,		Inst_imm_sr ), // supervisor
+	MATCH_ENTRY1_IMPL(0,16,0b0000001000111100,		ANDI,		Inst_imm_ccr ),
+	MATCH_ENTRY1_IMPL(0,16,0b0000101000111100,		EORI,		Inst_imm_ccr ),
+	MATCH_ENTRY1_IMPL(0,16,0b0000000000111100,		ORI,		Inst_imm_ccr ),
+	MATCH_ENTRY1_IMPL(0,16,0b0000000001111100,		ORI,		Inst_imm_sr ), // supervisor
+	MATCH_ENTRY1_IMPL(0,16,0b0000001001111100,		ANDI,		Inst_imm_sr ), // supervisor
 
-	MATCH_ENTRY1_IMPL(0,16,0b0100101011111100,		"illegal",	Inst_simple ),
-	MATCH_ENTRY1_IMPL(0,16,0b0100111001110000,		"reset",	Inst_simple ), // supervisor
-	MATCH_ENTRY1_IMPL(0,16,0b0100111001110001,		"nop",		Inst_simple ),
-	MATCH_ENTRY1_IMPL(0,16,0b0100111001110011,		"rte",		Inst_simple ), // supervisor
-	MATCH_ENTRY1_IMPL(0,16,0b0100111001110101,		"rts",		Inst_simple ),
-	MATCH_ENTRY1_IMPL(0,16,0b0100111001110110,		"trapv",	Inst_simple ),
-	MATCH_ENTRY1_IMPL(0,16,0b0100111001110111,		"rtr",		Inst_simple ),
-	MATCH_ENTRY1_IMPL(0,16,0b0100111001110010,		"stop",		Inst_stop ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100101011111100,		ILLEGAL,	Inst_simple ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110000,		RESET,		Inst_simple ), // supervisor
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110001,		NOP,		Inst_simple ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110011,		RTE,		Inst_simple ), // supervisor
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110101,		RTS,		Inst_simple ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110110,		TRAPV,		Inst_simple ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110111,		RTR,		Inst_simple ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110010,		STOP,		Inst_stop ),
 
-	MATCH_ENTRY1_IMPL(3,13,0b0100100001000,			"swap",		Inst_swap ),
-	MATCH_ENTRY1_IMPL(3,13,0b0100111001010,			"link",		Inst_link_w ),
-	//([ ( 3,13, 0b0100100000001)			  ,		"link.l",	Inst_link_l ),  # not on 68000
-	MATCH_ENTRY1_IMPL(3,13,0b0100111001011,			"unlk",		Inst_unlk ),
-	MATCH_ENTRY1_IMPL(3,13,0b0100111001100,			"move",		Inst_move_to_usp ),
-	MATCH_ENTRY1_IMPL(3,13,0b0100111001101,			"move",		Inst_move_from_usp ),
-	MATCH_ENTRY1_IMPL(3,13,0b0100100010000,			"ext",		Inst_ext ),
-	MATCH_ENTRY1_IMPL(3,13,0b0100100011000,			"ext",		Inst_ext ),
-	//([ ( 3,13, 0b0100100011000)			  ,		"extb.l",	Inst_ext ),	 # not on 68000
+	MATCH_ENTRY1_IMPL(3,13,0b0100100001000,			SWAP,		Inst_swap ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100111001010,			LINK,		Inst_link_w ),
+	//([ ( 3,13, 0b0100100000001)			  ,		"LINK.L",	Inst_link_l ),  # not on 68000
+	MATCH_ENTRY1_IMPL(3,13,0b0100111001011,			UNLK,		Inst_unlk ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100111001100,			MOVE,		Inst_move_to_usp ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100111001101,			MOVE,		Inst_move_from_usp ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100100010000,			EXT,		Inst_ext ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100100011000,			EXT,		Inst_ext ),
+	//([ ( 3,13, 0b0100100011000)			  ,		"EXTB.L",	Inst_ext ),	 # not on 68000
 
-	MATCH_ENTRY1_IMPL(4,12,0b010011100100,			"trap",		Inst_trap ),
+	MATCH_ENTRY1_IMPL(4,12,0b010011100100,			TRAP,		Inst_trap ),
 
-	MATCH_ENTRY1_IMPL(6,10,0b0100000011,			"move",		Inst_move_from_sr ),   // supervisor
-	MATCH_ENTRY1_IMPL(6,10,0b0100011011,			"move",		Inst_move_to_sr ),   // supervisor
-	//([ ( 6,10, 0b0100001011)				 ,		"move from ccr",	 Inst ),		  # not on 68000
-	MATCH_ENTRY1_IMPL(6,10,0b0100010011,			"move",		Inst_move_to_ccr ),
-	MATCH_ENTRY1_IMPL(6,10,0b0100100000,			"nbcd",		Inst_nbcd ),
-	MATCH_ENTRY1_IMPL(6,10,0b0100100001,			"pea",		Inst_pea ),
-	MATCH_ENTRY1_IMPL(6,10,0b0100101011,			"tas",		Inst_tas ),
-	MATCH_ENTRY1_IMPL(6,10,0b0100111010,			"jsr",		Inst_jump ),
-	MATCH_ENTRY1_IMPL(6,10,0b0100111011,			"jmp",		Inst_jump ),
-	MATCH_ENTRY1_IMPL(6,10,0b1110000011,			"asr",		Inst_asl_asr_mem ),
-	MATCH_ENTRY1_IMPL(6,10,0b1110000111,			"asl",		Inst_asl_asr_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100000011,			MOVE,		Inst_move_from_sr ),   // supervisor
+	MATCH_ENTRY1_IMPL(6,10,0b0100011011,			MOVE,		Inst_move_to_sr ),   // supervisor
+	//([ ( 6,10, 0b0100001011)				 ,		"MOVE FROM Ccr",	 Inst ),		  # not on 68000
+	MATCH_ENTRY1_IMPL(6,10,0b0100010011,			MOVE,		Inst_move_to_ccr ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100100000,			NBCD,		Inst_nbcd ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100100001,			PEA,		Inst_pea ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100101011,			TAS,		Inst_tas ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100111010,			JSR,		Inst_jump ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100111011,			JMP,		Inst_jump ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110000011,			ASR,		Inst_asl_asr_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110000111,			ASL,		Inst_asl_asr_mem ),
 
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b100001,	"movep",	Inst_movep_mem_reg ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b101001,	"movep",	Inst_movep_mem_reg ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b110001,	"movep",	Inst_movep_reg_mem ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b111001,	"movep",	Inst_movep_reg_mem ),
-	MATCH_ENTRY1_IMPL(6,10,0b0000100001,			"bchg",		Inst_bchg_imm ),
-	MATCH_ENTRY1_IMPL(6,10,0b0000100010,			"bclr",		Inst_bchg_imm ),
-	MATCH_ENTRY1_IMPL(6,10,0b0000100011,			"bset",		Inst_bchg_imm ),
-	MATCH_ENTRY1_IMPL(6,10,0b0000100000,			"btst",		Inst_bchg_imm ),
-	MATCH_ENTRY1_IMPL(7,9,0b010010001,				"movem",	Inst_movem_reg_mem ), // Register to memory.
-	MATCH_ENTRY1_IMPL(7,9,0b010011001,				"movem",	Inst_movem_mem_reg ), // Memory to register.
-	MATCH_ENTRY1_IMPL(8,8,0b00000000,				"ori",		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00000010,				"andi",		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00000100,				"subi",		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00000110,				"addi",		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00001010,				"eori",		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00001100,				"cmpi",		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b01000000,				"negx",		Inst_size_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b01000010,				"clr",		Inst_size_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b01000100,				"neg",		Inst_size_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b01000110,				"not",		Inst_size_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b01001010,				"tst",		Inst_size_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100000,				"bra",		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100001,				"bsr",		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100010,				"bhi",		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100011,				"bls",		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100100,				"bcc",		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100101,				"bcs",		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100110,				"bne",		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100111,				"beq",		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101000,				"bvc",		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101001,				"bvs",		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101010,				"bpl",		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101011,				"bmi",		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101100,				"bge",		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101101,				"blt",		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101110,				"bgt",		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101111,				"ble",		Inst_branch ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b100001,	MOVEP,		Inst_movep_mem_reg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b101001,	MOVEP,		Inst_movep_mem_reg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b110001,	MOVEP,		Inst_movep_reg_mem ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b111001,	MOVEP,		Inst_movep_reg_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000100001,			BCHG,		Inst_bchg_imm ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000100010,			BCLR,		Inst_bchg_imm ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000100011,			BSET,		Inst_bchg_imm ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000100000,			BTST,		Inst_bchg_imm ),
+	MATCH_ENTRY1_IMPL(7,9,0b010010001,				MOVEM,		Inst_movem_reg_mem ), // Register to memory.
+	MATCH_ENTRY1_IMPL(7,9,0b010011001,				MOVEM,		Inst_movem_mem_reg ), // Memory to register.
+	MATCH_ENTRY1_IMPL(8,8,0b00000000,				ORI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00000010,				ANDI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00000100,				SUBI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00000110,				ADDI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00001010,				EORI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00001100,				CMPI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b01000000,				NEGX,		Inst_size_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b01000010,				CLR,		Inst_size_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b01000100,				NEG,		Inst_size_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b01000110,				NOT,		Inst_size_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b01001010,				TST,		Inst_size_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100000,				BRA,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100001,				BSR,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100010,				BHI,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100011,				BLS,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100100,				BCC,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100101,				BCS,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100110,				BNE,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100111,				BEQ,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101000,				BVC,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101001,				BVS,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101010,				BPL,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101011,				BMI,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101100,				BGE,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101101,				BLT,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101110,				BGT,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101111,				BLE,		Inst_branch ),
 
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b101,		"bchg",		Inst_bchg ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b110,		"bclr",		Inst_bchg ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b111,		"bset",		Inst_bchg ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b100,		"btst",		Inst_bchg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b101,		BCHG,		Inst_bchg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b110,		BCLR,		Inst_bchg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b111,		BSET,		Inst_bchg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b100,		BTST,		Inst_bchg ),
 
-	//Table 3-19. Conditional Tests
-	// These sneakily take the "001" in the bottom 3 bits to override the EA parts of Scc
-	MATCH_ENTRY1_IMPL(3,13,0b0101000011001,			"dbra",		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101000111001,			"dbf",		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101001011001,			"dbhi",		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101001111001,			"dbls",		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101010011001,			"dbcc",		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101010111001,			"dbcs",		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101011011001,			"dbne",		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101011111001,			"dbeq",		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101100011001,			"dbvc",		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101100111001,			"dbvs",		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101101011001,			"dbpl",		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101101111001,			"dbmi",		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101110011001,			"dbge",		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101110111001,			"dblt",		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101111011001,			"dbgt",		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101111111001,			"dble",		Inst_dbcc ),
+	//Table 3-19. Conditional TESTS
+	// These sneakily take the "001" in the bottom 3 BITS TO OVErride the EA parts of Scc
+	MATCH_ENTRY1_IMPL(3,13,0b0101000011001,			DBRA,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101000111001,			DBF,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101001011001,			DBHI,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101001111001,			DBLS,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101010011001,			DBCC,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101010111001,			DBCS,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101011011001,			DBNE,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101011111001,			DBEQ,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101100011001,			DBVC,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101100111001,			DBVS,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101101011001,			DBPL,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101101111001,			DBMI,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101110011001,			DBGE,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101110111001,			DBLT,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101111011001,			DBGT,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101111111001,			DBLE,		Inst_dbcc ),
 
-	MATCH_ENTRY1_IMPL(6,10,0b0101000011,			"st",		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101000111,			"sf",		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101001011,			"shi",		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101001111,			"sls",		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101010011,			"scc",		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101010111,			"scs",		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101011011,			"sne",		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101011111,			"seq",		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101100011,			"svc",		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101100111,			"svs",		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101101011,			"spl",		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101101111,			"smi",		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101110011,			"sge",		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101110111,			"slt",		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101111011,			"sgt",		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101111111,			"sle",		Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101000011,			ST,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101000111,			SF,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101001011,			SHI,		Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101001111,			SLS,		Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101010011,			SCC,		Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101010111,			SCS,		Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101011011,			SNE,		Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101011111,			SEQ,		Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101100011,			SVC,		Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101100111,			SVS,		Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101101011,			SPL,		Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101101111,			SMI,		Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101110011,			SGE,		Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101110111,			SLT,		Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101111011,			SGT,		Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101111111,			SLE,		Inst_scc ),
 
-	MATCH_ENTRY2_IMPL(12,4,0b0101, 8,1,0b1,			"subq",		Inst_subq ),
-	MATCH_ENTRY2_IMPL(12,4,0b0101, 8,1,0b0,			"addq",		Inst_subq ),
-	MATCH_ENTRY2_IMPL(12,4,0b0111, 8,1,0b0,			"moveq",	Inst_moveq ),
+	MATCH_ENTRY2_IMPL(12,4,0b0101, 8,1,0b1,			SUBQ,		Inst_subq ),
+	MATCH_ENTRY2_IMPL(12,4,0b0101, 8,1,0b0,			ADDQ,		Inst_subq ),
+	MATCH_ENTRY2_IMPL(12,4,0b0111, 8,1,0b0,			MOVEQ,		Inst_moveq ),
 
-	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b100000,	"sbcd",		Inst_sbcd_reg ),
-	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b100001,	"sbcd",		Inst_sbcd_predec ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b100000,	"abcd",		Inst_sbcd_reg ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b100001,	"abcd",		Inst_sbcd_predec ),
+	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b100000,	SBCD,		Inst_sbcd_reg ),
+	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b100001,	SBCD,		Inst_sbcd_predec ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b100000,	ABCD,		Inst_sbcd_reg ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b100001,	ABCD,		Inst_sbcd_predec ),
 
-	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,0,	"subx",		Inst_subx_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,1,	"subx",		Inst_subx_predec ),
-	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,0,	"addx",		Inst_subx_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,1,	"addx",		Inst_subx_predec ),
+	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,0,	SUBX,		Inst_subx_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,1,	SUBX,		Inst_subx_predec ),
+	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,0,	ADDX,		Inst_subx_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,1,	ADDX,		Inst_subx_predec ),
 
-	MATCH_ENTRY3_IMPL(12,4,0b1011, 8,1,1, 3,3,1,	"cmpm",		Inst_cmpm ),
-	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,2,3,			"cmpa",		Inst_cmpa ),
+	MATCH_ENTRY3_IMPL(12,4,0b1011, 8,1,1, 3,3,1,	CMPM,		Inst_cmpm ),
+	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,2,3,			CMPA,		Inst_cmpa ),
 
-	// Nasty case where eor and cmp mirror one another
-	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b100,		"eor",		Inst_eor ),
-	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b101,		"eor",		Inst_eor ),
-	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b110,		"eor",		Inst_eor ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 6,3,0b011,		"mulu",		Inst_muldiv ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 6,3,0b111,		"muls",		Inst_muldiv ),
+	// Nasty case where eor and cmp mirror one anothER
+	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b100,		EOR,		Inst_eor ),
+	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b101,		EOR,		Inst_eor ),
+	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b110,		EOR,		Inst_eor ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 6,3,0b011,		MULU,		Inst_muldiv ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 6,3,0b111,		MULS,		Inst_muldiv ),
 
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,1,	"asl",		Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,0,	"asr",		Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,1, 8,1,1,	"lsl",		Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,1, 8,1,0,	"lsr",		Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,2, 8,1,1,	"roxl",		Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,2, 8,1,0,	"roxr",		Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,1,	"rol",		Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,0,	"ror",		Inst_shift_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,1,	ASL,		Inst_shift_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,0,	ASR,		Inst_shift_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,1, 8,1,1,	LSL,		Inst_shift_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,1, 8,1,0,	LSR,		Inst_shift_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,2, 8,1,1,	ROXL,		Inst_shift_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,2, 8,1,0,	ROXR,		Inst_shift_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,1,	ROL,		Inst_shift_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,0,	ROR,		Inst_shift_reg ),
 
-	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b111,		"lea",		Inst_lea ),
-	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b011,		"divu",		Inst_muldiv ),
-	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b111,		"divs",		Inst_muldiv ),
+	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b111,		LEA,		Inst_lea ),
+	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b011,		DIVU,		Inst_muldiv ),
+	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b111,		DIVS,		Inst_muldiv ),
 
-	// NOTE: specific case to override CHK since it doesn't support addressing mode 001
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101000,	"exg",		Inst_exg_dd ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101001,	"exg",		Inst_exg_aa ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b110001,	"exg",		Inst_exg_da ),
-	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b110,		"chk",		Inst_chk ),
-	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b100,		"chk",		Inst_chk ),	// not 68000
+	// NOTE: specific case to override CHK since it DOESN'T SUPPort addressing mode 001
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101000,	EXG,		Inst_exg_dd ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101001,	EXG,		Inst_exg_aa ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b110001,	EXG,		Inst_exg_da ),
+	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b110,		CHK,		Inst_chk ),
+	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b100,		CHK,		Inst_chk ),	// not 68000
 
-	MATCH_ENTRY2_IMPL(12,4,0b1001, 6,2,0b11,		"suba",		Inst_addsuba ),
-	MATCH_ENTRY2_IMPL(12,4,0b1101, 6,2,0b11,		"adda",		Inst_addsuba ),
+	MATCH_ENTRY2_IMPL(12,4,0b1001, 6,2,0b11,		SUBA,		Inst_addsuba ),
+	MATCH_ENTRY2_IMPL(12,4,0b1101, 6,2,0b11,		ADDA,		Inst_addsuba ),
 
-	// Fallback generics
-	MATCH_ENTRY1_IMPL(12,4,0b1011,					"cmp",		Inst_cmp ),
+	// Fallback GENERICS
+	MATCH_ENTRY1_IMPL(12,4,0b1011,					CMP,		Inst_cmp ),
 
-	// Following where src/dest is d-register
-	MATCH_ENTRY1_IMPL(12,4,0b1000,					"or",		Inst_alu_dreg ),
-	MATCH_ENTRY1_IMPL(12,4,0b1001,					"sub",		Inst_alu_dreg ),
-	MATCH_ENTRY1_IMPL(12,4,0b1101,					"add",		Inst_alu_dreg ),
-	MATCH_ENTRY1_IMPL(12,4,0b1100,					"and",		Inst_alu_dreg ),
+	// Following where src/dest is d-REGISTER
+	MATCH_ENTRY1_IMPL(12,4,0b1000,					OR,			Inst_alu_dreg ),
+	MATCH_ENTRY1_IMPL(12,4,0b1001,					SUB,		Inst_alu_dreg ),
+	MATCH_ENTRY1_IMPL(12,4,0b1101,					ADD,		Inst_alu_dreg ),
+	MATCH_ENTRY1_IMPL(12,4,0b1100,					AND,		Inst_alu_dreg ),
 
-	MATCH_ENTRY2_IMPL(13,3,0b001, 6,3,0b001,		"movea",	Inst_movea ),
-	MATCH_ENTRY1_IMPL(14,2,0b00,					"move",		Inst_move ),
+	MATCH_ENTRY2_IMPL(13,3,0b001, 6,3,0b001,		MOVEA,		Inst_movea ),
+	MATCH_ENTRY1_IMPL(14,2,0b00,					MOVE,		Inst_move ),
 
 	{ 0 }			 // end sentinel
 };
@@ -1275,20 +1275,19 @@ matcher_entry g_matcher_table[] =
 int decode(buffer_reader& buffer, instruction& inst)
 {
 	inst.byte_count = 2;	// assume error
-	inst.tag = NULL;
+	inst.opcode = Opcode::NONE;
 	inst.suffix = Suffix::NONE;
 
 	// Check remaining size
 	bool has32 = false;
 	uint16_t header0 = 0;
-	uint16_t header1 = 0;
 	uint32_t start_pos = buffer.get_pos();
 
-	if (buffer.get_remain() >= 2)
-	{
-		buffer.read_word(header0);
-		inst.header = header0;
-	}
+	if (buffer.get_remain() < 2)
+		return 1;
+
+	buffer.read_word(header0);
+	inst.header = header0;
 
 	// Make a temp copy of the reader to pass to the decoder, after the first word
 	buffer_reader reader_tmp = buffer;
@@ -1302,10 +1301,20 @@ int decode(buffer_reader& buffer, instruction& inst)
 			continue;
 
 		// Do specialised decoding
-		inst.tag = pEntry->tag;
+		inst.opcode = pEntry->opcode;
 		int res = 0;
 		if (pEntry->func)
 			res = pEntry->func(reader_tmp, inst, header);
+		
+		if (res)
+		{
+			// Handle decode func being partway through and failing
+			inst.opcode = Opcode::NONE;
+			inst.op0.type = OpType::INVALID;
+			inst.op1.type = OpType::INVALID;
+			return res;	// failed to decode
+		}
+
 		inst.byte_count = reader_tmp.get_pos() - start_pos;
 		return res;
 	}

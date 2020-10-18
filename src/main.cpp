@@ -10,6 +10,128 @@
 #include "instruction.h"
 #include "symbols.h"
 
+const char* instruction_names[Opcode::COUNT] =
+{
+	"none",
+	"abcd",
+	"add",
+	"adda",
+	"addi",
+	"addq",
+	"addx",
+	"and",
+	"andi",
+	"asl",
+	"asr",
+	"bcc",
+	"bchg",
+	"bclr",
+	"bcs",
+	"beq",
+	"bge",
+	"bgt",
+	"bhi",
+	"ble",
+	"bls",
+	"blt",
+	"bmi",
+	"bne",
+	"bpl",
+	"bra",
+	"bset",
+	"bsr",
+	"btst",
+	"bvc",
+	"bvs",
+	"chk",
+	"clr",
+	"cmp",
+	"cmpi",
+	"cmpa",
+	"cmpm",
+	"dbcc",
+	"dbcs",
+	"dbeq",
+	"dbf",
+	"dbge",
+	"dbgt",
+	"dbhi",
+	"dble",
+	"dbls",
+	"dblt",
+	"dbmi",
+	"dbne",
+	"dbpl",
+	"dbra",
+	"dbvc",
+	"dbvs",
+	"divs",
+	"divu",
+	"eor",
+	"eori",
+	"exg",
+	"ext",
+	"illegal",
+	"jmp",
+	"jsr",
+	"lea",
+	"link",
+	"lsl",
+	"lsr",
+	"move",
+	"movea",
+	"movem",
+	"movep",
+	"moveq",
+	"muls",
+	"mulu",
+	"nbcd",
+	"neg",
+	"negx",
+	"nop",
+	"not",
+	"or",
+	"ori",
+	"pea",
+	"reset",
+	"rol",
+	"ror",
+	"roxl",
+	"roxr",
+	"rte",
+	"rtr",
+	"rts",
+	"sbcd",
+	"scc",
+	"scs",
+	"seq",
+	"sf",
+	"sge",
+	"sgt",
+	"shi",
+	"sle",
+	"sls",
+	"slt",
+	"smi",
+	"sne",
+	"spl",
+	"st",
+	"stop",
+	"sub",
+	"suba",
+	"subi",
+	"subq",
+	"subx",
+	"svc",
+	"svs",
+	"swap",
+	"tas",
+	"trap",
+	"trapv",
+	"tst",
+	"unlk"
+};
+
 // ----------------------------------------------------------------------------
 //	INSTRUCTION ANALYSIS
 // ----------------------------------------------------------------------------
@@ -78,8 +200,6 @@ int decode_buf(buffer_reader& buf, const symbols& symbols, disassembly& disasm)
 		int res = decode(buf_copy, line.inst);
 
 		// Handle failure
-		if (res != 0)
-			line.inst.tag = NULL;
 		disasm.lines.push_back(line);
 
 		buf.advance(line.inst.byte_count);
@@ -221,12 +341,12 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 // ----------------------------------------------------------------------------
 void print(const instruction& inst, const symbols& symbols, uint32_t inst_address, FILE* pFile)
 {
-	if (!inst.tag)
+	if (inst.opcode == Opcode::NONE)
 	{
 		fprintf(pFile, "dc.w $%x", inst.header);
 		return;
 	}
-	fprintf(pFile, "%s", inst.tag);
+	fprintf(pFile, "%s", instruction_names[inst.opcode]);
 
 	switch (inst.suffix)
 	{
@@ -254,7 +374,7 @@ void print(const instruction& inst, const symbols& symbols, uint32_t inst_addres
 }
 
 // ----------------------------------------------------------------------------
-int print(const symbols& symbols, const disassembly& disasm)
+int print(const symbols& symbols, const disassembly& disasm, FILE* pOutput)
 {
 	for (size_t i = 0; i < disasm.lines.size(); ++i)
 	{
@@ -263,17 +383,13 @@ int print(const symbols& symbols, const disassembly& disasm)
 		// TODO very naive label check
 		symbol sym;
 		if (find_symbol(symbols, line.address, sym))
-			printf("%s:\n", sym.label.c_str());
+			fprintf(pOutput, "%s:\n", sym.label.c_str());
 
-		//printf(">> %04x:   $%04x ", line.address, line.inst.header);
-		printf("\t");
+		//fprintf(pOutput, ">> %04x:   $%04x ", line.address, line.inst.header);
+		fprintf(pOutput, "\t");
+		print(line.inst, symbols, line.address, pOutput);
 
-		if (line.inst.tag != NULL)
-			print(line.inst, symbols, line.address, stdout);
-		else
-			printf("dc.w $%x", line.inst.header);
-
-		printf("\n");
+		fprintf(pOutput, "\n");
 	}
 	return 0;
 }
@@ -398,7 +514,7 @@ int read_symbols(buffer_reader& buf, const tos_header& header, symbols& symbols)
 }
 
 // ----------------------------------------------------------------------------
-int process_tos_file(const uint8_t* pData, long size)
+int process_tos_file(const uint8_t* pData, long size, FILE* pOutput)
 {
 	buffer_reader buf(pData, size);
 	tos_header header = {};
@@ -424,8 +540,7 @@ int process_tos_file(const uint8_t* pData, long size)
 		return 1;
 
 	// Next section is text
-	fprintf(stdout, "Reading text section\n");
-
+	fprintf(pOutput, "; Reading text section\n");
 	buffer_reader text_buf(buf.get_data(), header.ph_tlen);
 
 	// Skip the text
@@ -440,6 +555,7 @@ int process_tos_file(const uint8_t* pData, long size)
 
 	symbols exe_symbols;
 
+	fprintf(pOutput, "; Reading symbols...\n");
 	int ret = read_symbols(symbol_buf, header, exe_symbols);
 
 	disassembly disasm;
@@ -448,7 +564,7 @@ int process_tos_file(const uint8_t* pData, long size)
 
 	add_reference_symbols(disasm, exe_symbols);
 
-	print(exe_symbols, disasm);
+	print(exe_symbols, disasm, pOutput);
 	return 0;
 }
 
@@ -476,5 +592,5 @@ int main(int argc, char** argv)
 	int readBytes = fread(pData, 1, size, pInfile);
 	fclose(pInfile);
 
-	return process_tos_file(pData, size);
+	return process_tos_file(pData, size, stdout);
 }
