@@ -3,7 +3,7 @@ LD=clang #g++
 
 SRC_PATH=.
 OUT_PATH=./bin/hopper
-CPP_SRC=./main.cpp
+CPP_SRC=./main.cpp ./decode.cpp
 
 CPP_OBJ=$(CPP_SRC:${SRC_PATH}/%.cpp=${SRC_PATH}/%.o)
 CFLAGS=-I${SRC_PATH}/lib -DDEBUG -std=c++11 -MMD
@@ -19,7 +19,7 @@ include *.d
 
 # Final exe
 ${OUT_PATH}: ${CPP_OBJ}
-	${LD} ${LDFLAGS} $< -g -o $@
+	${LD} ${LDFLAGS} $^ -g -o $@
 
 clean:
 	@rm -rf *.o
