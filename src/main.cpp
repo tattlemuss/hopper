@@ -413,7 +413,7 @@ void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 				sym.address = target_address;
 				sym.section = symbol::section_type::TEXT;
 				sym.label = std::string("L") + std::to_string(label_id);
-				symbols.table.push_back(sym);
+				add_symbol(symbols, sym);
 				++label_id;
 			}
 		}
@@ -425,7 +425,7 @@ void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 				sym.address = target_address;
 				sym.section = symbol::section_type::TEXT;
 				sym.label = std::string("L") + std::to_string(label_id);
-				symbols.table.push_back(sym);
+				add_symbol(symbols, sym);
 				++label_id;
 			}
 		}
@@ -507,7 +507,7 @@ int read_symbols(buffer_reader& buf, const tos_header& header, symbols& symbols)
 				break;
 		}
 		if (sym.section != symbol::section_type::UNKNOWN)
-			symbols.table.push_back(sym);
+			add_symbol(symbols, sym);
 	}
 
 	return 0;

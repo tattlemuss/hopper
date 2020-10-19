@@ -2,7 +2,7 @@
 #define SYMBOLS_H
 #include <cstdint>
 #include <string>
-#include <vector>
+#include <map>
 
 // ----------------------------------------------------------------------------
 //	SYMBOL STORAGE
@@ -26,9 +26,10 @@ struct symbol
 class symbols
 {
 public:
-	std::vector<symbol>		table;
+	std::map<uint32_t, symbol>		table;
 };
 
+extern bool add_symbol(symbols& symbols, const symbol& new_symbol);
 extern bool find_symbol(const symbols& symbols, uint32_t address, symbol& result);
 
 #endif
