@@ -2,7 +2,7 @@
 #define DECODE_H
 
 class buffer_reader;
-class instruction;
+struct instruction;
 
 extern int decode(buffer_reader& buffer, instruction& inst);
 
