@@ -1086,7 +1086,7 @@ struct matcher_entry
 		(val<<(shift)) | (val2<<(shift2)) | (val3<<(shift3)), \
 	   Opcode::tag, func }
 
-matcher_entry g_matcher_table[] =
+const matcher_entry g_matcher_table_0000[] =
 {
 	//		          SH CT							Tag				  Decoder
 	MATCH_ENTRY1_IMPL(0,16,0b0000101001111100,		EORI,		Inst_imm_sr ), // supervisor
@@ -1096,6 +1096,53 @@ matcher_entry g_matcher_table[] =
 	MATCH_ENTRY1_IMPL(0,16,0b0000000001111100,		ORI,		Inst_imm_sr ), // supervisor
 	MATCH_ENTRY1_IMPL(0,16,0b0000001001111100,		ANDI,		Inst_imm_sr ), // supervisor
 
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b100001,	MOVEP,		Inst_movep_mem_reg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b101001,	MOVEP,		Inst_movep_mem_reg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b110001,	MOVEP,		Inst_movep_reg_mem ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b111001,	MOVEP,		Inst_movep_reg_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000100001,			BCHG,		Inst_bchg_imm ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000100010,			BCLR,		Inst_bchg_imm ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000100011,			BSET,		Inst_bchg_imm ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000100000,			BTST,		Inst_bchg_imm ),
+
+	MATCH_ENTRY1_IMPL(8,8,0b00000000,				ORI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00000010,				ANDI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00000100,				SUBI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00000110,				ADDI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00001010,				EORI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00001100,				CMPI,		Inst_integer_imm_ea ),
+
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b101,		BCHG,		Inst_bchg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b110,		BCLR,		Inst_bchg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b111,		BSET,		Inst_bchg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b100,		BTST,		Inst_bchg ),
+
+	MATCH_ENTRY1_IMPL(12,4,0b0000,					MOVE,		Inst_move ),
+	{0}
+};
+
+const matcher_entry g_matcher_table_0001[] =
+{
+	MATCH_ENTRY1_IMPL(12,4,0b0001,					MOVE,		Inst_move ),
+	{0}
+};
+
+const matcher_entry g_matcher_table_0010[] =
+{
+	MATCH_ENTRY2_IMPL(12,4,0b0010, 6,3,0b001,		MOVEA,		Inst_movea ),
+	MATCH_ENTRY1_IMPL(12,4,0b0010,					MOVE,		Inst_move ),
+	{0}
+};
+
+const matcher_entry g_matcher_table_0011[] =
+{
+	MATCH_ENTRY2_IMPL(12,4,0b0011, 6,3,0b001,		MOVEA,		Inst_movea ),
+	MATCH_ENTRY1_IMPL(12,4,0b0011,					MOVE,		Inst_move ),
+	{0}
+};
+
+const matcher_entry g_matcher_table_0100[] =
+{
 	MATCH_ENTRY1_IMPL(0,16,0b0100101011111100,		ILLEGAL,	Inst_simple ),
 	MATCH_ENTRY1_IMPL(0,16,0b0100111001110000,		RESET,		Inst_simple ), // supervisor
 	MATCH_ENTRY1_IMPL(0,16,0b0100111001110001,		NOP,		Inst_simple ),
@@ -1126,52 +1173,26 @@ matcher_entry g_matcher_table[] =
 	MATCH_ENTRY1_IMPL(6,10,0b0100101011,			TAS,		Inst_tas ),
 	MATCH_ENTRY1_IMPL(6,10,0b0100111010,			JSR,		Inst_jump ),
 	MATCH_ENTRY1_IMPL(6,10,0b0100111011,			JMP,		Inst_jump ),
-	MATCH_ENTRY1_IMPL(6,10,0b1110000011,			ASR,		Inst_asl_asr_mem ),
-	MATCH_ENTRY1_IMPL(6,10,0b1110000111,			ASL,		Inst_asl_asr_mem ),
 
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b100001,	MOVEP,		Inst_movep_mem_reg ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b101001,	MOVEP,		Inst_movep_mem_reg ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b110001,	MOVEP,		Inst_movep_reg_mem ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b111001,	MOVEP,		Inst_movep_reg_mem ),
-	MATCH_ENTRY1_IMPL(6,10,0b0000100001,			BCHG,		Inst_bchg_imm ),
-	MATCH_ENTRY1_IMPL(6,10,0b0000100010,			BCLR,		Inst_bchg_imm ),
-	MATCH_ENTRY1_IMPL(6,10,0b0000100011,			BSET,		Inst_bchg_imm ),
-	MATCH_ENTRY1_IMPL(6,10,0b0000100000,			BTST,		Inst_bchg_imm ),
 	MATCH_ENTRY1_IMPL(7,9,0b010010001,				MOVEM,		Inst_movem_reg_mem ), // Register to memory.
 	MATCH_ENTRY1_IMPL(7,9,0b010011001,				MOVEM,		Inst_movem_mem_reg ), // Memory to register.
-	MATCH_ENTRY1_IMPL(8,8,0b00000000,				ORI,		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00000010,				ANDI,		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00000100,				SUBI,		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00000110,				ADDI,		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00001010,				EORI,		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00001100,				CMPI,		Inst_integer_imm_ea ),
+
 	MATCH_ENTRY1_IMPL(8,8,0b01000000,				NEGX,		Inst_size_ea ),
 	MATCH_ENTRY1_IMPL(8,8,0b01000010,				CLR,		Inst_size_ea ),
 	MATCH_ENTRY1_IMPL(8,8,0b01000100,				NEG,		Inst_size_ea ),
 	MATCH_ENTRY1_IMPL(8,8,0b01000110,				NOT,		Inst_size_ea ),
 	MATCH_ENTRY1_IMPL(8,8,0b01001010,				TST,		Inst_size_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100000,				BRA,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100001,				BSR,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100010,				BHI,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100011,				BLS,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100100,				BCC,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100101,				BCS,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100110,				BNE,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100111,				BEQ,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101000,				BVC,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101001,				BVS,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101010,				BPL,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101011,				BMI,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101100,				BGE,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101101,				BLT,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101110,				BGT,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101111,				BLE,		Inst_branch ),
 
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b101,		BCHG,		Inst_bchg ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b110,		BCLR,		Inst_bchg ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b111,		BSET,		Inst_bchg ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b100,		BTST,		Inst_bchg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b111,		LEA,		Inst_lea ),
 
+	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b110,		CHK,		Inst_chk ),
+	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b100,		CHK,		Inst_chk ),	// not 68000
+
+	{0}
+};
+
+const matcher_entry g_matcher_table_0101[] =
+{
 	//Table 3-19. Conditional TESTS
 	// These sneakily take the "001" in the bottom 3 BITS TO OVErride the EA parts of Scc
 	MATCH_ENTRY1_IMPL(3,13,0b0101000011001,			DBRA,		Inst_dbcc ),
@@ -1210,28 +1231,101 @@ matcher_entry g_matcher_table[] =
 
 	MATCH_ENTRY2_IMPL(12,4,0b0101, 8,1,0b1,			SUBQ,		Inst_subq ),
 	MATCH_ENTRY2_IMPL(12,4,0b0101, 8,1,0b0,			ADDQ,		Inst_subq ),
+	{0}
+};
+
+const matcher_entry g_matcher_table_0110[] =
+{
+	MATCH_ENTRY1_IMPL(8,8,0b01100000,				BRA,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100001,				BSR,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100010,				BHI,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100011,				BLS,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100100,				BCC,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100101,				BCS,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100110,				BNE,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100111,				BEQ,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101000,				BVC,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101001,				BVS,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101010,				BPL,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101011,				BMI,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101100,				BGE,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101101,				BLT,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101110,				BGT,		Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101111,				BLE,		Inst_branch ),
+
+	{0}
+};
+
+const matcher_entry g_matcher_table_0111[] =
+{
 	MATCH_ENTRY2_IMPL(12,4,0b0111, 8,1,0b0,			MOVEQ,		Inst_moveq ),
 
+	{0}
+};
+
+const matcher_entry g_matcher_table_1000[] =
+{
 	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b100000,	SBCD,		Inst_sbcd_reg ),
 	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b100001,	SBCD,		Inst_sbcd_predec ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b100000,	ABCD,		Inst_sbcd_reg ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b100001,	ABCD,		Inst_sbcd_predec ),
+	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b011,		DIVU,		Inst_muldiv ),
+	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b111,		DIVS,		Inst_muldiv ),
+	MATCH_ENTRY1_IMPL(12,4,0b1000,					OR,			Inst_alu_dreg ),
+	{0}
+};
 
+const matcher_entry g_matcher_table_1001[] =
+{
 	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,0,	SUBX,		Inst_subx_reg ),
 	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,1,	SUBX,		Inst_subx_predec ),
-	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,0,	ADDX,		Inst_subx_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,1,	ADDX,		Inst_subx_predec ),
+	MATCH_ENTRY2_IMPL(12,4,0b1001, 6,2,0b11,		SUBA,		Inst_addsuba ),
+	MATCH_ENTRY1_IMPL(12,4,0b1001,					SUB,		Inst_alu_dreg ),
+	{0}
+};
 
+const matcher_entry g_matcher_table_1010[] =
+{
+	{0}
+};
+
+const matcher_entry g_matcher_table_1011[] =
+{
 	MATCH_ENTRY3_IMPL(12,4,0b1011, 8,1,1, 3,3,1,	CMPM,		Inst_cmpm ),
 	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,2,3,			CMPA,		Inst_cmpa ),
-
-	// Nasty case where eor and cmp mirror one anothER
+	// Nasty case where eor and cmp mirror one another
 	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b100,		EOR,		Inst_eor ),
 	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b101,		EOR,		Inst_eor ),
 	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b110,		EOR,		Inst_eor ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 6,3,0b011,		MULU,		Inst_muldiv ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 6,3,0b111,		MULS,		Inst_muldiv ),
+	// Fallback GENERICS
+	MATCH_ENTRY1_IMPL(12,4,0b1011,					CMP,		Inst_cmp ),
+	{0}
+};
 
+const matcher_entry g_matcher_table_1100[] =
+{
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b100000,	ABCD,		Inst_sbcd_reg ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b100001,	ABCD,		Inst_sbcd_predec ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100,    6,3,0b011,	MULU,		Inst_muldiv ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100,    6,3,0b111,	MULS,		Inst_muldiv ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101000,	EXG,		Inst_exg_dd ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101001,	EXG,		Inst_exg_aa ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b110001,	EXG,		Inst_exg_da ),
+	MATCH_ENTRY1_IMPL(12,4,0b1100,					AND,		Inst_alu_dreg ),
+	{0}
+};
+
+const matcher_entry g_matcher_table_1101[] =
+{
+	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,0,	ADDX,		Inst_subx_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,1,	ADDX,		Inst_subx_predec ),
+	MATCH_ENTRY2_IMPL(12,4,0b1101, 6,2,0b11,		ADDA,		Inst_addsuba ),
+	MATCH_ENTRY1_IMPL(12,4,0b1101,					ADD,		Inst_alu_dreg ),
+	{0}
+};
+
+const matcher_entry g_matcher_table_1110[] =
+{
+	MATCH_ENTRY1_IMPL(6,10,0b1110000011,			ASR,		Inst_asl_asr_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110000111,			ASL,		Inst_asl_asr_mem ),
 	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,1,	ASL,		Inst_shift_reg ),
 	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,0,	ASR,		Inst_shift_reg ),
 	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,1, 8,1,1,	LSL,		Inst_shift_reg ),
@@ -1240,34 +1334,32 @@ matcher_entry g_matcher_table[] =
 	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,2, 8,1,0,	ROXR,		Inst_shift_reg ),
 	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,1,	ROL,		Inst_shift_reg ),
 	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,0,	ROR,		Inst_shift_reg ),
+	{0}
+};
 
-	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b111,		LEA,		Inst_lea ),
-	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b011,		DIVU,		Inst_muldiv ),
-	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b111,		DIVS,		Inst_muldiv ),
+const matcher_entry g_matcher_table_1111[] =
+{
+	{0}
+};
 
-	// NOTE: specific case to override CHK since it DOESN'T SUPPort addressing mode 001
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101000,	EXG,		Inst_exg_dd ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101001,	EXG,		Inst_exg_aa ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b110001,	EXG,		Inst_exg_da ),
-	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b110,		CHK,		Inst_chk ),
-	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b100,		CHK,		Inst_chk ),	// not 68000
-
-	MATCH_ENTRY2_IMPL(12,4,0b1001, 6,2,0b11,		SUBA,		Inst_addsuba ),
-	MATCH_ENTRY2_IMPL(12,4,0b1101, 6,2,0b11,		ADDA,		Inst_addsuba ),
-
-	// Fallback GENERICS
-	MATCH_ENTRY1_IMPL(12,4,0b1011,					CMP,		Inst_cmp ),
-
-	// Following where src/dest is d-REGISTER
-	MATCH_ENTRY1_IMPL(12,4,0b1000,					OR,			Inst_alu_dreg ),
-	MATCH_ENTRY1_IMPL(12,4,0b1001,					SUB,		Inst_alu_dreg ),
-	MATCH_ENTRY1_IMPL(12,4,0b1101,					ADD,		Inst_alu_dreg ),
-	MATCH_ENTRY1_IMPL(12,4,0b1100,					AND,		Inst_alu_dreg ),
-
-	MATCH_ENTRY2_IMPL(13,3,0b001, 6,3,0b001,		MOVEA,		Inst_movea ),
-	MATCH_ENTRY1_IMPL(14,2,0b00,					MOVE,		Inst_move ),
-
-	{ 0 }			 // end sentinel
+const matcher_entry* g_matcher_tables[16] =
+{
+	g_matcher_table_0000,
+	g_matcher_table_0001,
+	g_matcher_table_0010,
+	g_matcher_table_0011,
+	g_matcher_table_0100,
+	g_matcher_table_0101,
+	g_matcher_table_0110,
+	g_matcher_table_0111,
+	g_matcher_table_1000,
+	g_matcher_table_1001,
+	g_matcher_table_1010,
+	g_matcher_table_1011,
+	g_matcher_table_1100,
+	g_matcher_table_1101,
+	g_matcher_table_1110,
+	g_matcher_table_1111,
 };
 
 // ----------------------------------------------------------------------------
@@ -1291,10 +1383,12 @@ int decode(buffer_reader& buffer, instruction& inst)
 
 	// Make a temp copy of the reader to pass to the decoder, after the first word
 	buffer_reader reader_tmp = buffer;
-	for (const matcher_entry* pEntry = g_matcher_table;
+	uint16_t table = (header0 >> 12) & 0xf;
+	for (const matcher_entry* pEntry = g_matcher_tables[table];
 		pEntry->mask0 != 0;
 		++pEntry)
 	{
+		assert(((pEntry->val0 >> 12) & 0xf) == table);
 		// Choose 16 or 32 bits for the check
 		uint32_t header = header0;
 		if ((header & pEntry->mask0) != pEntry->val0)
