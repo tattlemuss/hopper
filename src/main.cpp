@@ -9,6 +9,7 @@
 #include "decode.h"
 #include "instruction.h"
 #include "symbols.h"
+#include "timing.h"
 
 const char* instruction_names[Opcode::COUNT] =
 {
@@ -362,15 +363,21 @@ void print(const instruction& inst, const symbols& symbols, uint32_t inst_addres
 			break;
 	}
 
-	if (inst.op0.type == OpType::INVALID)
-		return;
-	fprintf(pFile, " ");
-	print(inst.op0, symbols, inst_address, pFile);
+	if (inst.op0.type != OpType::INVALID)
+	{
+		fprintf(pFile, " ");
+		print(inst.op0, symbols, inst_address, pFile);
+	}
 
-	if (inst.op1.type == OpType::INVALID)
-		return;
-	fprintf(pFile, ",");
-	print(inst.op1, symbols, inst_address, pFile);
+	if (inst.op1.type != OpType::INVALID)
+	{
+		fprintf(pFile, ",");
+		print(inst.op1, symbols, inst_address, pFile);
+	}
+
+	timing time;
+	if (calc_timing(inst, time) == 0)
+		fprintf(pFile, "\t; %d", time.min);
 }
 
 // ----------------------------------------------------------------------------

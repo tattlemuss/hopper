@@ -1,14 +1,15 @@
-CC=clang #g++
-LD=clang #g++
+CC=g++
+LD=g++
 
 SRC_PATH=.
 OUT_PATH=./bin/hopper
-CPP_SRC=./main.cpp ./decode.cpp ./symbols.cpp
+CPP_SRC=./main.cpp ./decode.cpp ./symbols.cpp ./timing.cpp
 
 CPP_OBJ=$(CPP_SRC:${SRC_PATH}/%.cpp=${SRC_PATH}/%.o)
 CPP_DEPS=$(CPP_SRC:${SRC_PATH}/%.cpp=${SRC_PATH}/%.d)
-CFLAGS=-I${SRC_PATH}/lib -DDEBUG -std=c++11 -MMD -g
-LDFLAGS=-lstdc++
+CFLAGS=-I${SRC_PATH}/lib -std=c++11 -MMD -DNDEBUG -g
+
+LDFLAGS=-lstdc++ -g
 
 %.o: %.cpp
 	${CC} ${CFLAGS} -c -o $@ $<
