@@ -2,7 +2,7 @@
 #define TIMING_H
 #include <cstdint>
 
-class instruction;
+struct instruction;
 
 struct timing
 {
