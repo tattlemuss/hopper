@@ -378,6 +378,8 @@ void print(const instruction& inst, const symbols& symbols, uint32_t inst_addres
 	timing time;
 	if (calc_timing(inst, time) == 0)
 		fprintf(pFile, "\t; %d", time.min);
+	else
+		fprintf(pFile, "\t; ?", time.min);
 }
 
 // ----------------------------------------------------------------------------
