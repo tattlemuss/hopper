@@ -576,6 +576,22 @@ int process_tos_file(const uint8_t* pData, long size, FILE* pOutput)
 }
 
 // ----------------------------------------------------------------------------
+int process_bin_file(const uint8_t* pData, long size, FILE* pOutput)
+{
+	buffer_reader buf(pData, size);
+	symbols bin_symbols;
+
+	disassembly disasm;
+	if (decode_buf(buf, bin_symbols, disasm))
+		return 1;
+
+	add_reference_symbols(disasm, bin_symbols);
+
+	print(bin_symbols, disasm, pOutput);
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
 int main(int argc, char** argv)
 {
 	if (argc < 2)
@@ -583,10 +599,20 @@ int main(int argc, char** argv)
 		fprintf(stderr, "No filename\n");
 		return 1;
 	}
-	FILE* pInfile = fopen(argv[1], "rb");
+
+	bool is_tos = true;
+
+	for (int opt = 1; opt < argc - 1; ++opt)
+	{
+		if (strcmp(argv[opt], "--bin") == 0)
+			is_tos = false;
+	}
+
+	const char* fname = argv[argc - 1];
+	FILE* pInfile = fopen(fname, "rb");
 	if (!pInfile)
 	{
-		fprintf(stderr, "Can't read file\n");
+		fprintf(stderr, "Can't read file: %s\n", fname);
 		return 1;
 	}
 
@@ -599,5 +625,8 @@ int main(int argc, char** argv)
 	int readBytes = fread(pData, 1, size, pInfile);
 	fclose(pInfile);
 
-	return process_tos_file(pData, size, stdout);
+	if (is_tos)
+		return process_tos_file(pData, size, stdout);
+	else
+		return process_bin_file(pData, size, stdout);
 }
