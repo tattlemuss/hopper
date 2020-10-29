@@ -989,6 +989,10 @@ int Inst_chk(buffer_reader& buffer, instruction& inst, uint32_t header)
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
 	Size ea_size = size ? Size::WORD : Size::LONG;
+	// Long size only allowed on 68020+
+	if (ea_size == Size::LONG)
+		return 1;
+
 	inst.suffix = size_to_suffix(ea_size);
 
 	set_dreg(inst.op1, dreg);
@@ -1275,9 +1279,9 @@ const matcher_entry g_matcher_table_1000[] =
 
 const matcher_entry g_matcher_table_1001[] =
 {
+	MATCH_ENTRY2_IMPL(12,4,0b1001, 6,2,0b11,		SUBA,		Inst_addsuba ),
 	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,0,	SUBX,		Inst_subx_reg ),
 	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,1,	SUBX,		Inst_subx_predec ),
-	MATCH_ENTRY2_IMPL(12,4,0b1001, 6,2,0b11,		SUBA,		Inst_addsuba ),
 	MATCH_ENTRY1_IMPL(12,4,0b1001,					SUB,		Inst_alu_dreg ),
 	{0}
 };
@@ -1315,9 +1319,9 @@ const matcher_entry g_matcher_table_1100[] =
 
 const matcher_entry g_matcher_table_1101[] =
 {
+	MATCH_ENTRY2_IMPL(12,4,0b1101, 6,2,0b11,		ADDA,		Inst_addsuba ),	// more specific than ADDX
 	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,0,	ADDX,		Inst_subx_reg ),
 	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,1,	ADDX,		Inst_subx_predec ),
-	MATCH_ENTRY2_IMPL(12,4,0b1101, 6,2,0b11,		ADDA,		Inst_addsuba ),
 	MATCH_ENTRY1_IMPL(12,4,0b1101,					ADD,		Inst_alu_dreg ),
 	{0}
 };
