@@ -1293,8 +1293,8 @@ const matcher_entry g_matcher_table_1010[] =
 
 const matcher_entry g_matcher_table_1011[] =
 {
-	MATCH_ENTRY3_IMPL(12,4,0b1011, 8,1,1, 3,3,1,	CMPM,		Inst_cmpm ),
 	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,2,3,			CMPA,		Inst_cmpa ),
+	MATCH_ENTRY3_IMPL(12,4,0b1011, 8,1,1, 3,3,1,	CMPM,		Inst_cmpm ),
 	// Nasty case where eor and cmp mirror one another
 	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b100,		EOR,		Inst_eor ),
 	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b101,		EOR,		Inst_eor ),
