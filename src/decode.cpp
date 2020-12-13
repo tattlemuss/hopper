@@ -333,7 +333,6 @@ int Inst_size_ea(buffer_reader& buffer, instruction& inst, uint32_t header)
 // ----------------------------------------------------------------------------
 int Inst_lea(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
-	uint8_t size = (header >> 6) & 3;
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
 	uint8_t dest_reg  = (header >> 9) & 7;
@@ -442,7 +441,7 @@ int Inst_movea(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_moveq(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_moveq(buffer_reader& /*buffer*/, instruction& inst, uint32_t header)
 {
 	inst.suffix = Suffix::LONG;
 
@@ -474,7 +473,7 @@ int Inst_subq(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_trap(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_trap(buffer_reader& /*buffer*/, instruction& inst, uint32_t header)
 {
 	set_imm_byte(inst.op0, header & 0xf);
 	return 0;
@@ -588,7 +587,7 @@ int Inst_addsuba(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_shift_reg(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_shift_reg(buffer_reader& /*buffer*/, instruction& inst, uint32_t header)
 {
 	uint8_t shift	= (header >> 9) & 7;
 	uint8_t size	 = (header >> 6) & 3;
@@ -620,7 +619,7 @@ int Inst_shift_reg(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_stop(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_stop(buffer_reader& buffer, instruction& inst, uint32_t /*header*/)
 {
 	uint16_t val;
 	if (buffer.read_word(val))
@@ -631,13 +630,13 @@ int Inst_stop(buffer_reader& buffer, instruction& inst, uint32_t header)
 
 // ----------------------------------------------------------------------------
 // Instructions without any operands
-int Inst_simple(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_simple(buffer_reader& /*buffer*/, instruction& /*inst*/, uint32_t /*header*/)
 {
 	return 0;
 }
 
 // ----------------------------------------------------------------------------
-int Inst_swap(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_swap(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 {
 	uint8_t reg = (header >> 0) & 7;
 	set_dreg(inst.op0, reg);
@@ -661,7 +660,7 @@ int Inst_link_w(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_unlk(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_unlk(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 {
 	uint8_t reg = (header >> 0) & 7;
 	set_areg(inst.op0, reg);
@@ -669,7 +668,7 @@ int Inst_unlk(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_move_from_usp(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_move_from_usp(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 {
 	uint8_t reg = (header >> 0) & 7;
 	inst.op0.type = OpType::USP;
@@ -678,7 +677,7 @@ int Inst_move_from_usp(buffer_reader& buffer, instruction& inst, uint32_t header
 }
 
 // ----------------------------------------------------------------------------
-int Inst_move_to_usp(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_move_to_usp(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 {
 	uint8_t reg = (header >> 0) & 7;
 	set_areg(inst.op0, reg);
@@ -733,7 +732,6 @@ int Inst_jump(buffer_reader& buffer, instruction& inst, uint32_t header)
 // ----------------------------------------------------------------------------
 int Inst_asl_asr_mem(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
-	uint8_t size = (header >> 6) & 3;
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
 	// "An operand in memory can be shifted one bit only, and the operand size is restricted to a word."
@@ -765,7 +763,7 @@ int Inst_branch(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_ext(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_ext(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 {
 	// NOTE: this needs to be changed if handling ext byte->long
 	uint8_t mode = (header >> 6) & 1;
@@ -837,7 +835,7 @@ int Inst_scc(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_sbcd_reg(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_sbcd_reg(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 {
 	uint8_t regx = (header >> 0) & 7;
 	uint8_t regy = (header >> 9) & 7;
@@ -847,7 +845,7 @@ int Inst_sbcd_reg(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_sbcd_predec(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_sbcd_predec(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 {
 	uint8_t regx = (header >> 0) & 7;
 	uint8_t regy = (header >> 9) & 7;
@@ -857,7 +855,7 @@ int Inst_sbcd_predec(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_subx_reg(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_subx_reg(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 {
 	uint8_t size = (header >> 6) & 3;
 	Size ea_size = standard_size_table[size];
@@ -872,7 +870,7 @@ int Inst_subx_reg(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_subx_predec(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_subx_predec(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 {
 	uint8_t size = (header >> 6) & 3;
 	Size ea_size = standard_size_table[size];
@@ -888,7 +886,7 @@ int Inst_subx_predec(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_cmpm(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_cmpm(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 {
 	uint8_t size = (header >> 6) & 3;
 	Size ea_size = standard_size_table[size];
@@ -1000,7 +998,7 @@ int Inst_chk(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_exg_dd(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_exg_dd(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 {
 	uint8_t regx = (header >> 0) & 7;
 	uint8_t regy = (header >> 9) & 7;
@@ -1010,7 +1008,7 @@ int Inst_exg_dd(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_exg_aa(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_exg_aa(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 {
 	uint8_t regx = (header >> 0) & 7;
 	uint8_t regy = (header >> 9) & 7;
@@ -1020,7 +1018,7 @@ int Inst_exg_aa(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_exg_da(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_exg_da(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 {
 	uint8_t regx = (header >> 0) & 7;
 	uint8_t regy = (header >> 9) & 7;
@@ -1030,7 +1028,7 @@ int Inst_exg_da(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_imm_ccr(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_imm_ccr(buffer_reader& buffer, instruction& inst, uint32_t /*header*/)
 {
 	uint16_t val16;
 	if (buffer.read_word(val16))
@@ -1044,7 +1042,7 @@ int Inst_imm_ccr(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_imm_sr(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_imm_sr(buffer_reader& buffer, instruction& inst, uint32_t /*header*/)
 {
 	uint16_t val16;
 	if (buffer.read_word(val16))
@@ -1090,6 +1088,8 @@ struct matcher_entry
 		(val<<(shift)) | (val2<<(shift2)) | (val3<<(shift3)), \
 	   Opcode::tag, func }
 
+#define MATCH_END		{ 0, 0, Opcode::COUNT, NULL}
+
 const matcher_entry g_matcher_table_0000[] =
 {
 	//		          SH CT							Tag				  Decoder
@@ -1122,27 +1122,27 @@ const matcher_entry g_matcher_table_0000[] =
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b100,		BTST,		Inst_bchg ),
 
 	MATCH_ENTRY1_IMPL(12,4,0b0000,					MOVE,		Inst_move ),
-	{0}
+	MATCH_END
 };
 
 const matcher_entry g_matcher_table_0001[] =
 {
 	MATCH_ENTRY1_IMPL(12,4,0b0001,					MOVE,		Inst_move ),
-	{0}
+	MATCH_END
 };
 
 const matcher_entry g_matcher_table_0010[] =
 {
 	MATCH_ENTRY2_IMPL(12,4,0b0010, 6,3,0b001,		MOVEA,		Inst_movea ),
 	MATCH_ENTRY1_IMPL(12,4,0b0010,					MOVE,		Inst_move ),
-	{0}
+	MATCH_END
 };
 
 const matcher_entry g_matcher_table_0011[] =
 {
 	MATCH_ENTRY2_IMPL(12,4,0b0011, 6,3,0b001,		MOVEA,		Inst_movea ),
 	MATCH_ENTRY1_IMPL(12,4,0b0011,					MOVE,		Inst_move ),
-	{0}
+	MATCH_END
 };
 
 const matcher_entry g_matcher_table_0100[] =
@@ -1192,7 +1192,7 @@ const matcher_entry g_matcher_table_0100[] =
 	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b110,		CHK,		Inst_chk ),
 	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b100,		CHK,		Inst_chk ),	// not 68000
 
-	{0}
+	MATCH_END
 };
 
 const matcher_entry g_matcher_table_0101[] =
@@ -1235,7 +1235,7 @@ const matcher_entry g_matcher_table_0101[] =
 
 	MATCH_ENTRY2_IMPL(12,4,0b0101, 8,1,0b1,			SUBQ,		Inst_subq ),
 	MATCH_ENTRY2_IMPL(12,4,0b0101, 8,1,0b0,			ADDQ,		Inst_subq ),
-	{0}
+	MATCH_END
 };
 
 const matcher_entry g_matcher_table_0110[] =
@@ -1257,14 +1257,14 @@ const matcher_entry g_matcher_table_0110[] =
 	MATCH_ENTRY1_IMPL(8,8,0b01101110,				BGT,		Inst_branch ),
 	MATCH_ENTRY1_IMPL(8,8,0b01101111,				BLE,		Inst_branch ),
 
-	{0}
+	MATCH_END
 };
 
 const matcher_entry g_matcher_table_0111[] =
 {
 	MATCH_ENTRY2_IMPL(12,4,0b0111, 8,1,0b0,			MOVEQ,		Inst_moveq ),
 
-	{0}
+	MATCH_END
 };
 
 const matcher_entry g_matcher_table_1000[] =
@@ -1274,7 +1274,7 @@ const matcher_entry g_matcher_table_1000[] =
 	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b011,		DIVU,		Inst_muldiv ),
 	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b111,		DIVS,		Inst_muldiv ),
 	MATCH_ENTRY1_IMPL(12,4,0b1000,					OR,			Inst_alu_dreg ),
-	{0}
+	MATCH_END
 };
 
 const matcher_entry g_matcher_table_1001[] =
@@ -1283,12 +1283,12 @@ const matcher_entry g_matcher_table_1001[] =
 	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,0,	SUBX,		Inst_subx_reg ),
 	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,1,	SUBX,		Inst_subx_predec ),
 	MATCH_ENTRY1_IMPL(12,4,0b1001,					SUB,		Inst_alu_dreg ),
-	{0}
+	MATCH_END
 };
 
 const matcher_entry g_matcher_table_1010[] =
 {
-	{0}
+	MATCH_END
 };
 
 const matcher_entry g_matcher_table_1011[] =
@@ -1301,7 +1301,7 @@ const matcher_entry g_matcher_table_1011[] =
 	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b110,		EOR,		Inst_eor ),
 	// Fallback GENERICS
 	MATCH_ENTRY1_IMPL(12,4,0b1011,					CMP,		Inst_cmp ),
-	{0}
+	MATCH_END
 };
 
 const matcher_entry g_matcher_table_1100[] =
@@ -1314,7 +1314,7 @@ const matcher_entry g_matcher_table_1100[] =
 	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101001,	EXG,		Inst_exg_aa ),
 	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b110001,	EXG,		Inst_exg_da ),
 	MATCH_ENTRY1_IMPL(12,4,0b1100,					AND,		Inst_alu_dreg ),
-	{0}
+	MATCH_END
 };
 
 const matcher_entry g_matcher_table_1101[] =
@@ -1323,7 +1323,7 @@ const matcher_entry g_matcher_table_1101[] =
 	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,0,	ADDX,		Inst_subx_reg ),
 	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,1,	ADDX,		Inst_subx_predec ),
 	MATCH_ENTRY1_IMPL(12,4,0b1101,					ADD,		Inst_alu_dreg ),
-	{0}
+	MATCH_END
 };
 
 const matcher_entry g_matcher_table_1110[] =
@@ -1338,12 +1338,12 @@ const matcher_entry g_matcher_table_1110[] =
 	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,2, 8,1,0,	ROXR,		Inst_shift_reg ),
 	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,1,	ROL,		Inst_shift_reg ),
 	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,0,	ROR,		Inst_shift_reg ),
-	{0}
+	MATCH_END
 };
 
 const matcher_entry g_matcher_table_1111[] =
 {
-	{0}
+	MATCH_END
 };
 
 const matcher_entry* g_matcher_tables[16] =
@@ -1375,7 +1375,6 @@ int decode(buffer_reader& buffer, instruction& inst)
 	inst.suffix = Suffix::NONE;
 
 	// Check remaining size
-	bool has32 = false;
 	uint16_t header0 = 0;
 	uint32_t start_pos = buffer.get_pos();
 
