@@ -587,7 +587,7 @@ int Inst_addsuba(buffer_reader& buffer, instruction& inst, uint32_t header)
 }
 
 // ----------------------------------------------------------------------------
-int Inst_shift_reg(buffer_reader& /*buffer*/, instruction& inst, uint32_t header)
+int Inst_shift_mem(buffer_reader& /*buffer*/, instruction& inst, uint32_t header)
 {
 	uint8_t shift	= (header >> 9) & 7;
 	uint8_t size	 = (header >> 6) & 3;
@@ -1330,14 +1330,22 @@ const matcher_entry g_matcher_table_1110[] =
 {
 	MATCH_ENTRY1_IMPL(6,10,0b1110000011,			ASR,		Inst_asl_asr_mem ),
 	MATCH_ENTRY1_IMPL(6,10,0b1110000111,			ASL,		Inst_asl_asr_mem ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,1,	ASL,		Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,0,	ASR,		Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,1, 8,1,1,	LSL,		Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,1, 8,1,0,	LSR,		Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,2, 8,1,1,	ROXL,		Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,2, 8,1,0,	ROXR,		Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,1,	ROL,		Inst_shift_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,0,	ROR,		Inst_shift_reg ),
+
+    MATCH_ENTRY1_IMPL(6,10,0b1110011011,			ROR,		Inst_asl_asr_mem ),
+    MATCH_ENTRY1_IMPL(6,10,0b1110011111,			ROL,		Inst_asl_asr_mem ),
+
+    MATCH_ENTRY1_IMPL(6,10,0b1110001011,			LSR,		Inst_asl_asr_mem ),
+    MATCH_ENTRY1_IMPL(6,10,0b1110001111,			LSL,		Inst_asl_asr_mem ),
+
+    MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,1,	ASL,		Inst_shift_mem ),
+    MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,0,	ASR,		Inst_shift_mem ),
+    MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,1, 8,1,1,	LSL,		Inst_shift_mem ),
+    MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,1, 8,1,0,	LSR,		Inst_shift_mem ),
+    MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,1,	ROL,		Inst_shift_mem ),
+    MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,0,	ROR,		Inst_shift_mem ),
+
+    MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,2, 8,1,1,	ROXL,		Inst_shift_mem ),
+    MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,2, 8,1,0,	ROXR,		Inst_shift_mem ),
 	MATCH_END
 };
 
