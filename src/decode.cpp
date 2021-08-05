@@ -526,14 +526,49 @@ int Inst_bchg_imm(buffer_reader& buffer, instruction& inst, uint32_t header)
 
 // ----------------------------------------------------------------------------
 // bchg, bset, bclr, btst
-int Inst_bchg(buffer_reader& buffer, instruction& inst, uint32_t header)
+int Inst_btst(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t bitreg = (header >> 9) & 7;
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
 
 	set_dreg(inst.op0, bitreg);
-	return decode_ea(buffer, inst.op1, ea_group::DATA_ALT, mode, reg, Size::BYTE);
+    return decode_ea(buffer, inst.op1, ea_group::DATA, mode, reg, Size::BYTE);
+}
+
+// ----------------------------------------------------------------------------
+// bchg, bset, bclr, btst
+int Inst_btst_imm(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+    uint8_t mode = (header >> 3) & 7;
+    uint8_t reg  = (header >> 0) & 7;
+
+    // Read the immediate data
+    uint16_t imm;
+    if (buffer.read_word(imm))
+        return 1;
+    if (imm & 0xff00)			   // top bits must be 0
+        return 1;
+
+    set_imm_byte(inst.op0, (imm >> 0) & 0xff);
+    if (decode_ea(buffer, inst.op1, ea_group::DATA, mode, reg, Size::NONE))
+        return 1;
+
+    // instruction size is LONG when using DREG.
+    inst.suffix = inst.op1.type == OpType::D_DIRECT ? Suffix::LONG : Suffix::BYTE;
+    return 0;
+}
+
+// ----------------------------------------------------------------------------
+// bchg, bset, bclr, btst
+int Inst_bchg(buffer_reader& buffer, instruction& inst, uint32_t header)
+{
+    uint8_t bitreg = (header >> 9) & 7;
+    uint8_t mode = (header >> 3) & 7;
+    uint8_t reg  = (header >> 0) & 7;
+
+    set_dreg(inst.op0, bitreg);
+    return decode_ea(buffer, inst.op1, ea_group::DATA_ALT, mode, reg, Size::BYTE);
 }
 
 // ----------------------------------------------------------------------------
@@ -1107,7 +1142,7 @@ const matcher_entry g_matcher_table_0000[] =
 	MATCH_ENTRY1_IMPL(6,10,0b0000100001,			BCHG,		Inst_bchg_imm ),
 	MATCH_ENTRY1_IMPL(6,10,0b0000100010,			BCLR,		Inst_bchg_imm ),
 	MATCH_ENTRY1_IMPL(6,10,0b0000100011,			BSET,		Inst_bchg_imm ),
-	MATCH_ENTRY1_IMPL(6,10,0b0000100000,			BTST,		Inst_bchg_imm ),
+    MATCH_ENTRY1_IMPL(6,10,0b0000100000,			BTST,		Inst_btst_imm ),
 
 	MATCH_ENTRY1_IMPL(8,8,0b00000000,				ORI,		Inst_integer_imm_ea ),
 	MATCH_ENTRY1_IMPL(8,8,0b00000010,				ANDI,		Inst_integer_imm_ea ),
@@ -1119,7 +1154,7 @@ const matcher_entry g_matcher_table_0000[] =
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b101,		BCHG,		Inst_bchg ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b110,		BCLR,		Inst_bchg ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b111,		BSET,		Inst_bchg ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b100,		BTST,		Inst_bchg ),
+    MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b100,		BTST,		Inst_btst ),
 
 	MATCH_ENTRY1_IMPL(12,4,0b0000,					MOVE,		Inst_move ),
 	MATCH_END
