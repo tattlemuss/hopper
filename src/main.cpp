@@ -63,7 +63,6 @@ const char* instruction_names[Opcode::COUNT] =
 	"dbmi",
 	"dbne",
 	"dbpl",
-	"dbra",
 	"dbvc",
 	"dbvs",
 	"divs",
@@ -374,29 +373,57 @@ void print(const instruction& inst, const symbols& symbols, uint32_t inst_addres
 		fprintf(pFile, ",");
 		print(inst.op1, symbols, inst_address, pFile);
 	}
-
-	timing time;
-	if (calc_timing(inst, time) == 0)
-		fprintf(pFile, "\t; %d", time.min);
-	else
-		fprintf(pFile, "\t; ?", time.min);
 }
 
 // ----------------------------------------------------------------------------
 int print(const symbols& symbols, const disassembly& disasm, FILE* pOutput)
 {
+	// previous flag for timing pairs
+	uint8_t prev_flag = 0;
+
 	for (size_t i = 0; i < disasm.lines.size(); ++i)
 	{
 		const disassembly::line& line = disasm.lines[i];
+		const instruction& inst = line.inst;
 
 		// TODO very naive label check
 		symbol sym;
 		if (find_symbol(symbols, line.address, sym))
 			fprintf(pOutput, "%s:\n", sym.label.c_str());
 
-		//fprintf(pOutput, ">> %04x:   $%04x ", line.address, line.inst.header);
+		fprintf(pOutput, ">> %04x:   $%04x ", line.address, line.inst.header);
 		fprintf(pOutput, "\t");
-		print(line.inst, symbols, line.address, pOutput);
+		print(inst, symbols, line.address, pOutput);
+
+		if (inst.opcode != Opcode::NONE)
+		{
+			timing timing;
+			if (calc_timing(inst, timing) != 0)
+			{
+				fprintf(pOutput, "\t; ?");
+			}
+			else
+			{
+				// Adjust timing for pairing.
+				// By default, round up to a multiple of four.
+				uint16_t time = (timing.min + 3) & 0xfffc;
+				const char* comment = "";
+
+				// Exception: previous inst has pair_back and we have pair_front,
+				// in which case we subtract 4
+				if ((prev_flag & PAIR_BACK) && (timing.flags & PAIR_FRONT))
+				{
+					time -= 4;
+					comment = " (pair)";
+				}
+				fprintf(pOutput, "\t; %d%s", time, comment);
+			}
+			prev_flag = timing.flags;
+		}
+		else
+		{
+			prev_flag = 0;
+		}
 
 		fprintf(pOutput, "\n");
 	}

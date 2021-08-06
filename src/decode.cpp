@@ -72,7 +72,7 @@ enum class ea_group
 };
 
 // Defines which instruction modes are allowed to have which EA modes
-bool mode_availability[][(int)ea_group::COUNT] =
+static bool mode_availability[][static_cast<int>(ea_group::COUNT)] =
 {
 	// DataAlt	Data	MemAlt	Mem		Ctrl	CMovem	CMovem2	Alt		All
 	{	true,	true,	false,	false,	false,	false,	false,	true,	true	}, // D_DIRECT			000 regno
@@ -1234,7 +1234,6 @@ const matcher_entry g_matcher_table_0101[] =
 {
 	//Table 3-19. Conditional TESTS
 	// These sneakily take the "001" in the bottom 3 BITS TO OVErride the EA parts of Scc
-	MATCH_ENTRY1_IMPL(3,13,0b0101000011001,			DBRA,		Inst_dbcc ),
 	MATCH_ENTRY1_IMPL(3,13,0b0101000111001,			DBF,		Inst_dbcc ),
 	MATCH_ENTRY1_IMPL(3,13,0b0101001011001,			DBHI,		Inst_dbcc ),
 	MATCH_ENTRY1_IMPL(3,13,0b0101001111001,			DBLS,		Inst_dbcc ),
