@@ -7,11 +7,12 @@ struct time_entry
 	Suffix		suffix;
 	OpType		type0;	
 	OpType		type1;
-	uint16_t	time_min;
-	uint16_t	time_max;
+	uint8_t		time_min;
+	uint8_t		time_max;
+	uint8_t		flags;
 };
 
-#define TIMING(op, suf, type0, type1, time)	{	Opcode::op, Suffix::suf, OpType::type0, OpType::type1, time, time }
+#define TIMING(op, suf, type0, type1, time, flags)	{	Opcode::op, Suffix::suf, OpType::type0, OpType::type1, time, time, flags }
 
 static const time_entry g_timingEntry[] = 
 {
@@ -100,10 +101,11 @@ bool check_standard_move(const instruction& inst, timing& result)
 	return 1;
 }
 
-
 int calc_timing(const instruction& inst, timing& result)
 {
 	// Special case: move instruction
+	result.min = result.max = 0;
+	result.flags = 0;
 	if (check_standard_move(inst, result) == 0)
 		return 0;
 
@@ -128,6 +130,7 @@ int calc_timing(const instruction& inst, timing& result)
 
 		result.min = curr_entry->time_min;
 		result.max = curr_entry->time_max;
+		result.flags = curr_entry->flags;
 		return 0;
 	}
     return 1;
