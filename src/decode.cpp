@@ -1371,6 +1371,9 @@ const matcher_entry g_matcher_table_1110[] =
 	MATCH_ENTRY1_IMPL(6,10,0b1110001011,			LSR,		Inst_asl_asr_mem ),
 	MATCH_ENTRY1_IMPL(6,10,0b1110001111,			LSL,		Inst_asl_asr_mem ),
 
+	MATCH_ENTRY1_IMPL(6,10,0b1110010011,			ROXR,		Inst_asl_asr_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110010111,			ROXL,		Inst_asl_asr_mem ),
+
 	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,1,	ASL,		Inst_shift_mem ),
 	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,0,	ASR,		Inst_shift_mem ),
 	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,1, 8,1,1,	LSL,		Inst_shift_mem ),
