@@ -182,4 +182,17 @@ loop2:
         move	(a7)+,ccr
        	ori	#$ff,ccr
         andi	#$ff,ccr
+	cmpa.l	d2,a0
+	cmpa.l	4(a0),a1
+	suba.l	d2,a0
+	suba.l	-(a4),a0
+	adda.l	d2,a0
+	addx.l	d2,d4
+	subx.l	d2,d1
+	ror	(a0)
+	rol	4(a0)
+	roxr	(a0,d0.w)
+	roxl	$1234
+
+
 label:	ds.w	1
