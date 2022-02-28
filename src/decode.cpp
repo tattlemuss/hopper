@@ -1035,8 +1035,8 @@ int Inst_chk(buffer_reader& buffer, instruction& inst, uint32_t header)
 // ----------------------------------------------------------------------------
 int Inst_exg_dd(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 {
-	uint8_t regx = (header >> 0) & 7;
-	uint8_t regy = (header >> 9) & 7;
+	uint8_t regx = (header >> 9) & 7;
+	uint8_t regy = (header >> 0) & 7;
 	set_dreg(inst.op0, regx);
 	set_dreg(inst.op1, regy);
 	return 0;
@@ -1045,8 +1045,8 @@ int Inst_exg_dd(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 // ----------------------------------------------------------------------------
 int Inst_exg_aa(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 {
-	uint8_t regx = (header >> 0) & 7;
-	uint8_t regy = (header >> 9) & 7;
+	uint8_t regx = (header >> 9) & 7;
+	uint8_t regy = (header >> 0) & 7;
 	set_areg(inst.op0, regx);
 	set_areg(inst.op1, regy);
 	return 0;
@@ -1055,8 +1055,8 @@ int Inst_exg_aa(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 // ----------------------------------------------------------------------------
 int Inst_exg_da(buffer_reader& /*header*/, instruction& inst, uint32_t header)
 {
-	uint8_t regx = (header >> 0) & 7;
-	uint8_t regy = (header >> 9) & 7;
+	uint8_t regx = (header >> 9) & 7;
+	uint8_t regy = (header >> 0) & 7;
 	set_dreg(inst.op0, regx);
 	set_areg(inst.op1, regy);
 	return 0;
