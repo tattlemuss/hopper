@@ -233,12 +233,12 @@ struct operand
 
 		struct
 		{
-			int16_t disp;
+			int32_t inst_disp;		// offset from the base instruction address. Can be $7ffe+6 bytes max.
 		} pc_disp;
 
 		struct
 		{
-			int8_t disp;
+			int32_t inst_disp;		// offset from the base instruction address. Can be $7ffe+6 bytes max.
 			uint8_t d_reg;
 			bool is_long;
 		} pc_disp_index;
@@ -250,7 +250,7 @@ struct operand
 
 		struct
 		{
-			int16_t disp;
+			int32_t inst_disp;		// offset from the base instruction address. Can be $7ffe+2 bytes max.
 		} relative_branch;
 
 	};
@@ -277,6 +277,7 @@ struct instruction
 	{
 	}
 
+	uint32_t	address;
 	uint16_t	header;			// first 16-bit word of data
 	uint16_t	byte_count;
 	Opcode		opcode;

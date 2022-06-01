@@ -151,7 +151,8 @@ int read_immediate(buffer_reader& buffer, operand& operand, Size size)
 }
 
 // ----------------------------------------------------------------------------
-int decode_ea(buffer_reader& buffer, operand& operand, ea_group group, uint8_t mode_bits, uint8_t reg_bits, Size size)
+int decode_ea(buffer_reader& buffer, operand& operand, ea_group group, uint8_t mode_bits, uint8_t reg_bits, Size size,
+	uint32_t inst_address)
 {
 	// Convert to an operand type
 	int ea_type = decode_operand_type(mode_bits, reg_bits);
@@ -187,6 +188,9 @@ int decode_ea(buffer_reader& buffer, operand& operand, ea_group group, uint8_t m
 
 	uint16_t val16;
 	uint32_t val32;
+	int8_t disp8;
+	int16_t disp16;		// 16-bit displacement
+	uint32_t read_address = buffer.get_address();
 	switch (operand.type)
 	{
 		case OpType::D_DIRECT:
@@ -247,16 +251,18 @@ int decode_ea(buffer_reader& buffer, operand& operand, ea_group group, uint8_t m
 			if (buffer.read_word(val16))
 				return 1;
 			// 16-bit displacement
-			operand.pc_disp.disp = (int16_t)val16;
+			disp16 = (int16_t) val16;
+			operand.pc_disp.inst_disp = read_address - inst_address + val16;
 			return 0;
 
 		case OpType::PC_DISP_INDEX:
 			if (buffer.read_word(val16))
 				return 1;
 			decode_brief_extension_word(val16,
-				operand.pc_disp_index.disp,
+				disp8,
 				operand.pc_disp_index.d_reg,
 				operand.pc_disp_index.is_long);
+			operand.pc_disp_index.inst_disp = read_address - inst_address + disp8;
 			return 0;
 
 		case OpType::IMMEDIATE:
@@ -310,7 +316,7 @@ int Inst_integer_imm_ea(buffer_reader& buffer, instruction& inst, uint32_t heade
 	// op1: EA
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, inst.op1, ea_group::DATA_ALT, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op1, ea_group::DATA_ALT, mode, reg, ea_size, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -327,7 +333,7 @@ int Inst_size_ea(buffer_reader& buffer, instruction& inst, uint32_t header)
 	if (ea_size == Size::NONE)
 		return 1;
 
-	return decode_ea(buffer, inst.op0, ea_group::DATA_ALT, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op0, ea_group::DATA_ALT, mode, reg, ea_size, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -341,7 +347,7 @@ int Inst_lea(buffer_reader& buffer, instruction& inst, uint32_t header)
 	inst.op1.type = OpType::A_DIRECT;
 	inst.op1.a_register.reg = dest_reg;
 
-	return decode_ea(buffer, inst.op0, ea_group::CONTROL, mode, reg, Size::LONG);
+	return decode_ea(buffer, inst.op0, ea_group::CONTROL, mode, reg, Size::LONG, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -352,6 +358,7 @@ int Inst_movem_reg_mem(buffer_reader& buffer, instruction& inst, uint32_t header
 	Size ea_size = (header >> 6) & 1 ? Size::LONG : Size::WORD;
 	inst.suffix = (header >> 6) & 1 ? Suffix::LONG : Suffix::WORD;
 
+	// NOTE: important to read mask first
 	uint16_t reg_mask;
 	if (buffer.read_word(reg_mask))
 		return 1;
@@ -359,7 +366,7 @@ int Inst_movem_reg_mem(buffer_reader& buffer, instruction& inst, uint32_t header
 	// src register
 	inst.op0.type = OpType::MOVEM_REG;
 	inst.op0.movem_reg.reg_mask = reg_mask;
-	if (decode_ea(buffer, inst.op1, ea_group::CONTROL_MOVEM1, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op1, ea_group::CONTROL_MOVEM1, mode, reg, ea_size, inst.address))
 		return 1;
 
 	// Special case: if we are -(a0) mode, order of registers is reversed
@@ -391,7 +398,7 @@ int Inst_movem_mem_reg(buffer_reader& buffer, instruction& inst, uint32_t header
 	// dst register
 	inst.op1.type = OpType::MOVEM_REG;
 	inst.op1.movem_reg.reg_mask = reg_mask;
-	return decode_ea(buffer, inst.op0, ea_group::CONTROL_MOVEM2, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op0, ea_group::CONTROL_MOVEM2, mode, reg, ea_size, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -411,10 +418,10 @@ int Inst_move(buffer_reader& buffer, instruction& inst, uint32_t header)
 	inst.suffix = size_to_suffix(ea_size);
 
 	// Src data comes first in the encoding
-	int ret = decode_ea(buffer, inst.op0, ea_group::ALL, src_mode, src_reg, ea_size);
+	int ret = decode_ea(buffer, inst.op0, ea_group::ALL, src_mode, src_reg, ea_size, inst.address);
 	if (ret != 0)
 		return ret;
-	ret = decode_ea(buffer, inst.op1, ea_group::DATA_ALT, dst_mode, dst_reg, ea_size);
+	ret = decode_ea(buffer, inst.op1, ea_group::DATA_ALT, dst_mode, dst_reg, ea_size, inst.address);
 	return ret;
 }
 
@@ -432,7 +439,7 @@ int Inst_movea(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 	inst.suffix = size_to_suffix(ea_size);
 
-	if (decode_ea(buffer, inst.op0, ea_group::ALL, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op0, ea_group::ALL, mode, reg, ea_size, inst.address))
 		return 1;
 
 	inst.op1.type = OpType::A_DIRECT;
@@ -469,7 +476,7 @@ int Inst_subq(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 
 	inst.suffix = size_to_suffix(ea_size);
-	return decode_ea(buffer, inst.op1, ea_group::ALT, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op1, ea_group::ALT, mode, reg, ea_size, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -487,7 +494,7 @@ int Inst_move_from_sr(buffer_reader& buffer, instruction& inst, uint32_t header)
 
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, inst.op1, ea_group::DATA, mode, reg, Size::WORD);
+	return decode_ea(buffer, inst.op1, ea_group::DATA, mode, reg, Size::WORD, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -498,7 +505,7 @@ int Inst_move_to_sr(buffer_reader& buffer, instruction& inst, uint32_t header)
 
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, inst.op0, ea_group::DATA, mode, reg, Size::WORD);
+	return decode_ea(buffer, inst.op0, ea_group::DATA, mode, reg, Size::WORD, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -516,7 +523,7 @@ int Inst_bchg_imm(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 
 	set_imm_byte(inst.op0, (imm >> 0) & 0xff);
-	if (decode_ea(buffer, inst.op1, ea_group::DATA_ALT, mode, reg, Size::NONE))
+	if (decode_ea(buffer, inst.op1, ea_group::DATA_ALT, mode, reg, Size::NONE, inst.address))
 		return 1;
 
 	// instruction size is LONG when using DREG.
@@ -533,7 +540,7 @@ int Inst_btst(buffer_reader& buffer, instruction& inst, uint32_t header)
 	uint8_t reg  = (header >> 0) & 7;
 
 	set_dreg(inst.op0, bitreg);
-	return decode_ea(buffer, inst.op1, ea_group::DATA, mode, reg, Size::BYTE);
+	return decode_ea(buffer, inst.op1, ea_group::DATA, mode, reg, Size::BYTE, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -551,7 +558,7 @@ int Inst_btst_imm(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 
 	set_imm_byte(inst.op0, (imm >> 0) & 0xff);
-	if (decode_ea(buffer, inst.op1, ea_group::DATA, mode, reg, Size::NONE))
+	if (decode_ea(buffer, inst.op1, ea_group::DATA, mode, reg, Size::NONE, inst.address))
 		return 1;
 
 	// instruction size is LONG when using DREG.
@@ -568,7 +575,7 @@ int Inst_bchg(buffer_reader& buffer, instruction& inst, uint32_t header)
 	uint8_t reg  = (header >> 0) & 7;
 
 	set_dreg(inst.op0, bitreg);
-	return decode_ea(buffer, inst.op1, ea_group::DATA_ALT, mode, reg, Size::BYTE);
+	return decode_ea(buffer, inst.op1, ea_group::DATA_ALT, mode, reg, Size::BYTE, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -591,14 +598,14 @@ int Inst_alu_dreg(buffer_reader& buffer, instruction& inst, uint32_t header)
 		// Src is d-reg
 		inst.op0.type = OpType::D_DIRECT;
 		inst.op0.d_register.reg = dreg;
-		return decode_ea(buffer, inst.op1, ea_group::MEM_ALT, mode, reg, ea_size);
+		return decode_ea(buffer, inst.op1, ea_group::MEM_ALT, mode, reg, ea_size, inst.address);
 	}
 	else
 	{
 		// Dest is d-reg
 		inst.op1.type = OpType::D_DIRECT;
 		inst.op1.d_register.reg = dreg;
-		return decode_ea(buffer, inst.op0, ea_group::ALL, mode, reg, ea_size);
+		return decode_ea(buffer, inst.op0, ea_group::ALL, mode, reg, ea_size, inst.address);
 	}
 }
 
@@ -618,7 +625,7 @@ int Inst_addsuba(buffer_reader& buffer, instruction& inst, uint32_t header)
 
 	inst.op1.type = OpType::A_DIRECT;
 	inst.op1.a_register.reg = areg;
-	return decode_ea(buffer, inst.op0, ea_group::ALL, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op0, ea_group::ALL, mode, reg, ea_size, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -726,7 +733,7 @@ int Inst_move_to_ccr(buffer_reader& buffer, instruction& inst, uint32_t header)
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
 	inst.op1.type = OpType::CCR;
-	return decode_ea(buffer, inst.op0, ea_group::DATA, mode, reg, Size::WORD);
+	return decode_ea(buffer, inst.op0, ea_group::DATA, mode, reg, Size::WORD, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -735,7 +742,7 @@ int Inst_nbcd(buffer_reader& buffer, instruction& inst, uint32_t header)
 	inst.suffix = Suffix::BYTE;
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, inst.op0, ea_group::DATA_ALT, mode, reg, Size::BYTE);
+	return decode_ea(buffer, inst.op0, ea_group::DATA_ALT, mode, reg, Size::BYTE, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -743,7 +750,7 @@ int Inst_pea(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, inst.op0, ea_group::CONTROL, mode, reg, Size::LONG);
+	return decode_ea(buffer, inst.op0, ea_group::CONTROL, mode, reg, Size::LONG, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -752,7 +759,7 @@ int Inst_tas(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, inst.op0, ea_group::DATA_ALT, mode, reg, Size::BYTE);
+	return decode_ea(buffer, inst.op0, ea_group::DATA_ALT, mode, reg, Size::BYTE, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -761,7 +768,7 @@ int Inst_jump(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, inst.op0, ea_group::CONTROL, mode, reg, Size::NONE);
+	return decode_ea(buffer, inst.op0, ea_group::CONTROL, mode, reg, Size::NONE, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -771,14 +778,14 @@ int Inst_asl_asr_mem(buffer_reader& buffer, instruction& inst, uint32_t header)
 	uint8_t reg  = (header >> 0) & 7;
 	// "An operand in memory can be shifted one bit only, and the operand size is restricted to a word."
 	inst.suffix = Suffix::WORD;
-	return decode_ea(buffer, inst.op0, ea_group::MEM_ALT, mode, reg, Size::WORD);
+	return decode_ea(buffer, inst.op0, ea_group::MEM_ALT, mode, reg, Size::WORD, inst.address);
 }
 
 // ----------------------------------------------------------------------------
 int Inst_branch(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	int8_t disp8 = (int8_t)(header & 0xff);
-
+	int32_t read_disp = buffer.get_address() - inst.address;
 	inst.op0.type = RELATIVE_BRANCH;
 	if (disp8 == 0)
 	{
@@ -786,12 +793,12 @@ int Inst_branch(buffer_reader& buffer, instruction& inst, uint32_t header)
 		uint16_t disp16;
 		if (buffer.read_word(disp16))
 			return 1;
-		inst.op0.relative_branch.disp = (int16_t)disp16;
+		inst.op0.relative_branch.inst_disp = read_disp + (int16_t)disp16;
 		inst.suffix = Suffix::WORD;
 	}
 	else
 	{
-		inst.op0.relative_branch.disp = disp8;
+		inst.op0.relative_branch.inst_disp = read_disp + disp8;
 		inst.suffix = Suffix::SHORT;
 	}
 	return 0;
@@ -851,13 +858,14 @@ int Inst_movep_reg_mem(buffer_reader& buffer, instruction& inst, uint32_t header
 int Inst_dbcc(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t dreg  = (header >> 0) & 7;
+	int32_t read_disp = buffer.get_address() - inst.address;
 	uint16_t disp16;
 	if (buffer.read_word(disp16))
 		return 1;
 
 	set_dreg(inst.op0, dreg);
 	inst.op1.type = RELATIVE_BRANCH;
-	inst.op1.relative_branch.disp = (int16_t)disp16;
+	inst.op1.relative_branch.inst_disp = read_disp + (int16_t)disp16;
 	return 0;
 }
 
@@ -866,7 +874,7 @@ int Inst_scc(buffer_reader& buffer, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, inst.op0, ea_group::DATA_ALT, mode, reg, Size::BYTE);
+	return decode_ea(buffer, inst.op0, ea_group::DATA_ALT, mode, reg, Size::BYTE, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -949,7 +957,7 @@ int Inst_cmpa(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 	inst.suffix = size_to_suffix(ea_size);
 
-	if (decode_ea(buffer, inst.op0, ea_group::ALL, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op0, ea_group::ALL, mode, reg, ea_size, inst.address))
 		return 1;
 	set_areg(inst.op1, areg);
 	return 0;
@@ -967,7 +975,7 @@ int Inst_cmp(buffer_reader& buffer, instruction& inst, uint32_t header)
 		return 1;
 	inst.suffix = size_to_suffix(ea_size);
 
-	if (decode_ea(buffer, inst.op0, ea_group::ALL, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op0, ea_group::ALL, mode, reg, ea_size, inst.address))
 		return 1;
 	set_dreg(inst.op1, dreg);
 	return 0;
@@ -989,7 +997,7 @@ int Inst_eor(buffer_reader& buffer, instruction& inst, uint32_t header)
 	set_dreg(inst.op0, dreg);
 
 	// dest is EA
-	if (decode_ea(buffer, inst.op1, ea_group::DATA_ALT, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op1, ea_group::DATA_ALT, mode, reg, ea_size, inst.address))
 		return 1;
 	return 0;
 }
@@ -1006,7 +1014,7 @@ int Inst_muldiv(buffer_reader& buffer, instruction& inst, uint32_t header)
 	inst.suffix = Suffix::WORD;
 
 	// src is EA
-	if (decode_ea(buffer, inst.op0, ea_group::DATA, mode, reg, ea_size))
+	if (decode_ea(buffer, inst.op0, ea_group::DATA, mode, reg, ea_size, inst.address))
 		return 1;
 
 	// dst is d-reg
@@ -1029,7 +1037,7 @@ int Inst_chk(buffer_reader& buffer, instruction& inst, uint32_t header)
 	inst.suffix = size_to_suffix(ea_size);
 
 	set_dreg(inst.op1, dreg);
-	return decode_ea(buffer, inst.op0, ea_group::DATA, mode, reg, ea_size);
+	return decode_ea(buffer, inst.op0, ea_group::DATA, mode, reg, ea_size, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -1426,6 +1434,7 @@ int decode(buffer_reader& buffer, instruction& inst)
 	if (buffer.get_remain() < 2)
 		return 1;
 
+	inst.address = buffer.get_address();
 	buffer.read_word(header0);
 	inst.header = header0;
 

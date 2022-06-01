@@ -8,9 +8,10 @@
 class buffer_reader
 {
 public:
-	buffer_reader(const uint8_t* pData, uint32_t  length) :
+	buffer_reader(const uint8_t* pData, uint32_t length, uint32_t base_address) :
 		m_pData(pData),
 		m_length(length),
+		m_baseAddress(base_address),
 		m_pos(0)
 	{}
 
@@ -73,6 +74,11 @@ public:
 		return m_pos;
 	}
 
+	uint32_t get_address() const
+	{
+		return m_baseAddress + m_pos;
+	}
+
 	uint32_t get_remain() const
 	{
 		return m_length - m_pos;
@@ -81,6 +87,7 @@ public:
 private:
 	const uint8_t*  m_pData;
 	const uint32_t  m_length;
+	const uint32_t  m_baseAddress;
 	uint32_t		m_pos;
 };
 

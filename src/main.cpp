@@ -140,32 +140,17 @@ bool calc_relative_address(const operand& op, uint32_t inst_address, uint32_t& t
 {
 	if (op.type == PC_DISP)
 	{
-		// Relative
-		int16_t disp = op.pc_disp.disp;
-
-		// The base PC is always +2 from the instruction address, since
-		// the 68000 has already fetched the header word by then
-		target_address = inst_address + 2 + disp;
+		target_address = inst_address + op.pc_disp.inst_disp;
 		return true;
 	}
 	else if (op.type == PC_DISP_INDEX)
 	{
-		// Relative
-		int8_t disp = op.pc_disp_index.disp;
-
-		// The base PC is always +2 from the instruction address, since
-		// the 68000 has already fetched the header word by then
-		target_address = inst_address + 2 + disp;
+		target_address = inst_address + op.pc_disp_index.inst_disp;
 		return true;
 	}
 	if (op.type == RELATIVE_BRANCH)
 	{
-		// Relative
-		int16_t disp = op.relative_branch.disp;
-
-		// The base PC is always +2 from the instruction address, since
-		// the 68000 has already fetched the header word by then
-		target_address = inst_address + 2 + disp;
+		target_address = inst_address + op.relative_branch.inst_disp;
 		return true;
 	}
 	return false;
@@ -466,8 +451,6 @@ void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 			}
 		}
 	}
-
-
 }
 
 // ----------------------------------------------------------------------------
@@ -552,7 +535,7 @@ int read_symbols(buffer_reader& buf, const tos_header& header, symbols& symbols)
 // ----------------------------------------------------------------------------
 int process_tos_file(const uint8_t* pData, long size, FILE* pOutput)
 {
-	buffer_reader buf(pData, size);
+	buffer_reader buf(pData, size, 0);
 	tos_header header = {};
 
 	if (buf.read_word(header.ph_branch))
@@ -577,17 +560,17 @@ int process_tos_file(const uint8_t* pData, long size, FILE* pOutput)
 
 	// Next section is text
 	fprintf(pOutput, "; Reading text section\n");
-	buffer_reader text_buf(buf.get_data(), header.ph_tlen);
+	buffer_reader text_buf(buf.get_data(), header.ph_tlen, 0);
 
 	// Skip the text
 	buf.advance(header.ph_tlen);
-	buffer_reader data_buf(buf.get_data(), header.ph_dlen);
+	buffer_reader data_buf(buf.get_data(), header.ph_dlen, 0);
 
 	// Skip the data
 	buf.advance(header.ph_dlen);
 
 	// (No BSS in the file, so symbols should be next)
-	buffer_reader symbol_buf(buf.get_data(), header.ph_slen);
+	buffer_reader symbol_buf(buf.get_data(), header.ph_slen, 0);
 
 	symbols exe_symbols;
 
@@ -607,7 +590,7 @@ int process_tos_file(const uint8_t* pData, long size, FILE* pOutput)
 // ----------------------------------------------------------------------------
 int process_bin_file(const uint8_t* pData, long size, FILE* pOutput)
 {
-	buffer_reader buf(pData, size);
+	buffer_reader buf(pData, size, 0);
 	symbols bin_symbols;
 
 	disassembly disasm;
