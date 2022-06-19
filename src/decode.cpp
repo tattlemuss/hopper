@@ -252,7 +252,7 @@ int decode_ea(buffer_reader& buffer, operand& operand, ea_group group, uint8_t m
 				return 1;
 			// 16-bit displacement
 			disp16 = (int16_t) val16;
-			operand.pc_disp.inst_disp = read_address - inst_address + val16;
+			operand.pc_disp.inst_disp = read_address - inst_address + disp16;
 			return 0;
 
 		case OpType::PC_DISP_INDEX:
