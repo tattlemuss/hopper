@@ -106,19 +106,22 @@ uint8_t decode_operand_type(uint8_t mode_bits, uint8_t reg_bits)
 }
 
 // ----------------------------------------------------------------------------
-// Split 16 bit raw displacement into signed 8-bit offset, register index and size
+// Split 16 bit raw displacement into signed 8-bit offset, register reg_number and size
 // e.g n(pc,d0.w) or n(a0,d0.w)
 // Additionally add scaling factor on 020+ machines
-void decode_brief_extension_word(uint16_t word, int cpu_type, int8_t& disp, uint8_t& data_reg, bool& is_long, uint8_t& scale)
+void decode_brief_extension_word(uint16_t word, int cpu_type, int8_t& disp, index_indirect& info)
 {
 	// The offset is 8-bits
 	disp = (int8_t)(word & 0xff);
-	data_reg = (word >> 12) & 7;
-	is_long = ((word >> 11) & 1);
-
-	scale = 1U;
+	info.is_long = ((word >> 11) & 1);
+	info.scale_shift = 0U;
 	if (cpu_type >= CPU_TYPE_68020)
-		scale = ((word >> 9) & 3);
+		info.scale_shift = ((word >> 9) & 3);
+
+	info.index_reg.reg_number = (word >> 12) & 7;
+	info.index_reg.register_type = 0;
+	if (cpu_type >= CPU_TYPE_68020)
+		info.index_reg.register_type = (word >> 15) & 1;
 }
 
 int read_immediate(buffer_reader& buffer, operand& operand, Size size)
@@ -234,12 +237,12 @@ int decode_ea(buffer_reader& buffer, const decode_settings& dsettings, operand& 
 			operand.indirect_index.a_reg = reg_bits;
 			if (buffer.read_word(val16))
 				return 1;
+
+			// The result depends on the extension word bit 8!
 			decode_brief_extension_word(val16,
 				dsettings.cpu_type,
 				operand.indirect_index.disp,
-				operand.indirect_index.d_reg,
-				operand.indirect_index.is_long,
-				operand.indirect_index.scale_shift);
+				operand.indirect_index.indirect_info);
 			return 0;
 
 		case OpType::ABSOLUTE_WORD:
@@ -268,9 +271,7 @@ int decode_ea(buffer_reader& buffer, const decode_settings& dsettings, operand& 
 			decode_brief_extension_word(val16,
 				dsettings.cpu_type,
 				disp8,
-				operand.pc_disp_index.d_reg,
-				operand.pc_disp_index.is_long,
-				operand.pc_disp_index.scale_shift);
+				operand.pc_disp_index.indirect_info);
 			operand.pc_disp_index.inst_disp = read_address - inst_address + disp8;
 			return 0;
 

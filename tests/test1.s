@@ -28,23 +28,23 @@
 	lea -35(a6,d7.w),a7
 	tas	3(a7,d7.w)
 	jsr	(a3)
-	jsr label
+	jsr L2
 	jsr $7ba0.w
 	jmp	5(a3)
-	jmp loop2
-	jsr	label
-	jmp	loop1
+	jmp L1
+	jsr	L2
+	jmp	L0
 	jmp -5(a2,d7.l)
 	asl.w	(a2)
-	asl.w	label
-	asr.w	label+2
-	asl.w	label
-	asr.w	label+2
-	or.l	loop1(pc),d7
-	or.l	loop1(pc,d7.w),d7
+	asl.w	L2
+	asr.w	L3
+	asl.w	L2
+	asr.w	L3
+	or.l	L0(pc),d7
+	or.l	L0(pc,d7.w),d7
 	asr.w	-(a2)
 	bchg.b	#$3,(a7)
-loop1:
+L0:
 	movem.l	d0-d6,-(a7)
 	movem.l	d0/d2/d4/a0/a2/a5,-(a7)
 	movem.l	d0/d2/d4/a0/a2/a5,$ffff8800.w
@@ -76,12 +76,12 @@ loop1:
 	neg.l	d7
 	not.b	d7
 	tst.b	(a7)
-	bra.s	loop1
-	bra.w	loop1
-	bcc.w	loop1
-	bra.s	loop2
-	bhi.w	loop2
-	bcc.w	loop2
+	bra.s	L0
+	bra.w	L0
+	bcc.w	L0
+	bra.s	L1
+	bhi.w	L1
+	bcc.w	L1
 	ext.w	d7
 	ext.l	d1
 	movep.w	d7,0(a7)
@@ -92,10 +92,10 @@ loop1:
 	bclr	d1,(a5)+
 	bset	d2,(a6)+
 	btst	d3,(a7)+
-	dbmi	d7,loop1
-	dbge	d7,loop1
-	dbf	d1,loop1
-	dbge	d2,loop1
+	dbmi	d7,L0
+	dbge	d7,L0
+	dbf	d1,L0
+	dbge	d2,L0
 	st	4(a7)
 	scc	4(a7)
 	scs	4(a7)
@@ -111,11 +111,11 @@ loop1:
 	addq.l	#$8,a0
 	addq.l	#$2,(a7)
 	addq.l	#$2,-(a7)
-loop2:
-	bra.s	loop2
-	bra.w	loop2
-	bsr.s	loop2
-	bsr.w	loop2
+L1:
+	bra.s	L1
+	bra.w	L1
+	bsr.s	L1
+	bsr.w	L1
 	sbcd	d7,d1
 	sbcd	-(a7),-(a1)
 	abcd	d7,d1
@@ -154,7 +154,7 @@ loop2:
 	cmpa.l	-(a4),a7
 	eor.w	d2,d7
 	eor.l	d2,(a7)
-	eor.b	d2,label
+	eor.b	d2,L2
 	mulu.w	(a1)+,d7
 	muls.w	-(a1),d7
 	asr.b	#$1,d7
@@ -195,6 +195,5 @@ loop2:
 	rol.w	4(a0)
 	roxr.w	0(a0,d0.w)
 	roxl.w	$1234.l
-
-
-label:	ds.w	1
+L2:	dc.w	0
+L3:	dc.w	0

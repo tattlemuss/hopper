@@ -239,12 +239,13 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 			fprintf(pFile, "%d(a%d)", operand.indirect_disp.disp, operand.indirect_disp.reg);
 			return;
 		case OpType::INDIRECT_INDEX:
-			fprintf(pFile, "%d(a%d,d%d.%s%s)",
+			fprintf(pFile, "%d(a%d,%s%d.%s%s)",
 					operand.indirect_index.disp,
 					operand.indirect_index.a_reg,
-					operand.indirect_index.d_reg,
-					operand.indirect_index.is_long ? "l" : "w",
-					g_scale_names[operand.indirect_index.scale_shift]);
+					operand.indirect_index.indirect_info.index_reg.register_type ? "a" : "d",
+					operand.indirect_index.indirect_info.index_reg.reg_number,
+					operand.indirect_index.indirect_info.is_long ? "l" : "w",
+					g_scale_names[operand.indirect_index.indirect_info.scale_shift]);
 			return;
 		case OpType::ABSOLUTE_WORD:
 			if (operand.absolute_word.wordaddr & 0x8000)
@@ -281,19 +282,20 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 
 			if (find_symbol(symbols, target_address, sym))
 			{
-				fprintf(pFile, "%s(pc,d%d.%s%s)",
+				fprintf(pFile, "%s(pc,%s%d.%s%s)",
 						sym.label.c_str(),
-						operand.pc_disp_index.d_reg,
-						operand.pc_disp_index.is_long ? "l" : "w",
-						g_scale_names[operand.pc_disp_index.scale_shift]);
+						operand.pc_disp_index.indirect_info.index_reg.register_type ? "a" : "d",
+						operand.pc_disp_index.indirect_info.index_reg.reg_number,
+						operand.pc_disp_index.indirect_info.is_long ? "l" : "w",
+						g_scale_names[operand.pc_disp_index.indirect_info.scale_shift]);
 			}
 			else
 			{
-				fprintf(pFile, "$%x(pc,d%d.%s)",
+				fprintf(pFile, "$%x(pc,%s%d.%s)",
 					target_address,
-					operand.pc_disp_index.d_reg,
-					operand.pc_disp_index.is_long ? "l" : "w");
-
+					operand.pc_disp_index.indirect_info.index_reg.register_type ? "a" : "d",
+					operand.pc_disp_index.indirect_info.index_reg.reg_number,
+					operand.pc_disp_index.indirect_info.is_long ? "l" : "w");
 			}
 			return;
 		}

@@ -162,6 +162,22 @@ enum OpType
 };
 
 // ----------------------------------------------------------------------------
+struct index_register
+{
+	uint8_t	register_type : 1;		// 0 == D-reg, 1 == A reg
+	uint8_t	reg_number;					// 0-7
+};
+
+// ----------------------------------------------------------------------------
+// Fields relating to address- or PC-index indirect
+struct index_indirect
+{
+	bool is_long;
+	uint8_t scale_shift;		// 0 - scale 1, 1 = scale*2, 2 = scale*4, 3=scale*8
+	index_register index_reg;
+};
+
+// ----------------------------------------------------------------------------
 struct operand
 {
 	operand() :
@@ -210,16 +226,14 @@ struct operand
 		struct
 		{
 			int16_t disp;
-			uint8_t reg;
+			uint8_t reg;						// Address register only
 		} indirect_disp;
 
 		struct
 		{
-			int8_t disp;
-			uint8_t a_reg;
-			uint8_t d_reg;
-			bool is_long;
-			uint8_t scale_shift;	// 0 - scale 1, 1 = scale*2, 2 = scale*4, 3=scale*8
+			int8_t disp;						// displacement [-128...127)
+			uint8_t a_reg;						// base register
+			index_indirect indirect_info;
 		} indirect_index;
 
 		struct
@@ -234,15 +248,15 @@ struct operand
 
 		struct
 		{
-			int32_t inst_disp;		// offset from the base instruction address. Can be $7ffe+6 bytes max.
+			// Base register is implicitly "PC"
+			int32_t inst_disp;					// offset from the base instruction address. Can be $7ffe+6 bytes max.
 		} pc_disp;
 
 		struct
 		{
-			int32_t inst_disp;		// offset from the base instruction address. Can be $7ffe+6 bytes max.
-			uint8_t d_reg;
-			bool is_long;
-			uint8_t scale_shift;	// 0 - scale 1, 1 = scale*2, 2 = scale*4, 3=scale*8
+			// Base register is implicitly "PC"
+			int32_t inst_disp;					// offset from the base instruction address. Can be $7ffe+6 bytes max.
+			index_indirect indirect_info;
 		} pc_disp_index;
 
 		struct
