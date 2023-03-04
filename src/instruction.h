@@ -219,6 +219,7 @@ struct operand
 			uint8_t a_reg;
 			uint8_t d_reg;
 			bool is_long;
+			uint8_t scale_shift;	// 0 - scale 1, 1 = scale*2, 2 = scale*4, 3=scale*8
 		} indirect_index;
 
 		struct
@@ -241,6 +242,7 @@ struct operand
 			int32_t inst_disp;		// offset from the base instruction address. Can be $7ffe+6 bytes max.
 			uint8_t d_reg;
 			bool is_long;
+			uint8_t scale_shift;	// 0 - scale 1, 1 = scale*2, 2 = scale*4, 3=scale*8
 		} pc_disp_index;
 
 		struct

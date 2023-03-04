@@ -108,12 +108,17 @@ uint8_t decode_operand_type(uint8_t mode_bits, uint8_t reg_bits)
 // ----------------------------------------------------------------------------
 // Split 16 bit raw displacement into signed 8-bit offset, register index and size
 // e.g n(pc,d0.w) or n(a0,d0.w)
-void decode_brief_extension_word(uint16_t word, int8_t& disp, uint8_t& data_reg, bool& is_long)
+// Additionally add scaling factor on 020+ machines
+void decode_brief_extension_word(uint16_t word, int cpu_type, int8_t& disp, uint8_t& data_reg, bool& is_long, uint8_t& scale)
 {
 	// The offset is 8-bits
 	disp = (int8_t)(word & 0xff);
 	data_reg = (word >> 12) & 7;
 	is_long = ((word >> 11) & 1);
+
+	scale = 1U;
+	if (cpu_type >= CPU_TYPE_68020)
+		scale = ((word >> 9) & 3);
 }
 
 int read_immediate(buffer_reader& buffer, operand& operand, Size size)
@@ -230,9 +235,11 @@ int decode_ea(buffer_reader& buffer, const decode_settings& dsettings, operand& 
 			if (buffer.read_word(val16))
 				return 1;
 			decode_brief_extension_word(val16,
+				dsettings.cpu_type,
 				operand.indirect_index.disp,
 				operand.indirect_index.d_reg,
-				operand.indirect_index.is_long);
+				operand.indirect_index.is_long,
+				operand.indirect_index.scale_shift);
 			return 0;
 
 		case OpType::ABSOLUTE_WORD:
@@ -259,9 +266,11 @@ int decode_ea(buffer_reader& buffer, const decode_settings& dsettings, operand& 
 			if (buffer.read_word(val16))
 				return 1;
 			decode_brief_extension_word(val16,
+				dsettings.cpu_type,
 				disp8,
 				operand.pc_disp_index.d_reg,
-				operand.pc_disp_index.is_long);
+				operand.pc_disp_index.is_long,
+				operand.pc_disp_index.scale_shift);
 			operand.pc_disp_index.inst_disp = read_address - inst_address + disp8;
 			return 0;
 

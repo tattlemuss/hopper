@@ -207,6 +207,14 @@ static const char* g_reg_names[] =
 	"a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7"
 };
 
+static const char* g_scale_names[] =
+{
+	"",
+	"*2",
+	"*4",
+	"*8"
+};
+
 // ----------------------------------------------------------------------------
 void print(const operand& operand, const symbols& symbols, uint32_t inst_address, FILE* pFile)
 {
@@ -231,11 +239,12 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 			fprintf(pFile, "%d(a%d)", operand.indirect_disp.disp, operand.indirect_disp.reg);
 			return;
 		case OpType::INDIRECT_INDEX:
-			fprintf(pFile, "%d(a%d,d%d.%s)",
+			fprintf(pFile, "%d(a%d,d%d.%s%s)",
 					operand.indirect_index.disp,
 					operand.indirect_index.a_reg,
 					operand.indirect_index.d_reg,
-					operand.indirect_index.is_long ? "l" : "w");
+					operand.indirect_index.is_long ? "l" : "w",
+					g_scale_names[operand.indirect_index.scale_shift]);
 			return;
 		case OpType::ABSOLUTE_WORD:
 			if (operand.absolute_word.wordaddr & 0x8000)
@@ -272,10 +281,11 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 
 			if (find_symbol(symbols, target_address, sym))
 			{
-				fprintf(pFile, "%s(pc,d%d.%s)",
+				fprintf(pFile, "%s(pc,d%d.%s%s)",
 						sym.label.c_str(),
 						operand.pc_disp_index.d_reg,
-						operand.pc_disp_index.is_long ? "l" : "w");
+						operand.pc_disp_index.is_long ? "l" : "w",
+						g_scale_names[operand.pc_disp_index.scale_shift]);
 			}
 			else
 			{
