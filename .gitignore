@@ -1,0 +1,5 @@
+tests/*.txt
+tests/*.diff
+tests/*.bin
+test1/*.prg
+

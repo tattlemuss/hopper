@@ -1,3 +1,5 @@
 *.d
 *.o
+*.prg
 .vscode/
+bin/hopper
