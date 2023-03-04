@@ -195,6 +195,12 @@ int decode_buf(buffer_reader& buf, const symbols& symbols, disassembly& disasm)
 // ----------------------------------------------------------------------------
 //	INSTRUCTION DISPLAY FORMATTING
 // ----------------------------------------------------------------------------
+struct print_settings
+{
+	bool show_address;
+	bool show_timings;
+};
+
 static const char* g_reg_names[] =
 {
 	"d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
@@ -361,7 +367,7 @@ void print(const instruction& inst, const symbols& symbols, uint32_t inst_addres
 }
 
 // ----------------------------------------------------------------------------
-int print(const symbols& symbols, const disassembly& disasm, FILE* pOutput)
+int print(const symbols& symbols, const disassembly& disasm, const print_settings& psettings, FILE* pOutput)
 {
 	// previous flag for timing pairs
 	uint8_t prev_flag = 0;
@@ -376,11 +382,14 @@ int print(const symbols& symbols, const disassembly& disasm, FILE* pOutput)
 		if (find_symbol(symbols, line.address, sym))
 			fprintf(pOutput, "%s:\n", sym.label.c_str());
 
-		fprintf(pOutput, ">> %04x:   $%04x ", line.address, line.inst.header);
+		if (psettings.show_address)
+		{
+			fprintf(pOutput, ">> %04x:   $%04x ", line.address, line.inst.header);
+		}
 		fprintf(pOutput, "\t");
 		print(inst, symbols, line.address, pOutput);
 
-		if (inst.opcode != Opcode::NONE)
+		if (psettings.show_timings && inst.opcode != Opcode::NONE)
 		{
 			timing timing;
 			if (calc_timing(inst, timing) != 0)
@@ -533,7 +542,7 @@ int read_symbols(buffer_reader& buf, const tos_header& header, symbols& symbols)
 }
 
 // ----------------------------------------------------------------------------
-int process_tos_file(const uint8_t* pData, long size, FILE* pOutput)
+int process_tos_file(const uint8_t* pData, long size, const print_settings& psettings, FILE* pOutput)
 {
 	buffer_reader buf(pData, size, 0);
 	tos_header header = {};
@@ -583,12 +592,12 @@ int process_tos_file(const uint8_t* pData, long size, FILE* pOutput)
 
 	add_reference_symbols(disasm, exe_symbols);
 
-	print(exe_symbols, disasm, pOutput);
+	print(exe_symbols, disasm, psettings, pOutput);
 	return 0;
 }
 
 // ----------------------------------------------------------------------------
-int process_bin_file(const uint8_t* pData, long size, FILE* pOutput)
+int process_bin_file(const uint8_t* pData, long size, const print_settings& psettings, FILE* pOutput)
 {
 	buffer_reader buf(pData, size, 0);
 	symbols bin_symbols;
@@ -599,7 +608,7 @@ int process_bin_file(const uint8_t* pData, long size, FILE* pOutput)
 
 	add_reference_symbols(disasm, bin_symbols);
 
-	print(bin_symbols, disasm, pOutput);
+	print(bin_symbols, disasm, psettings, pOutput);
 	return 0;
 }
 
@@ -613,11 +622,23 @@ int main(int argc, char** argv)
 	}
 
 	bool is_tos = true;
+	print_settings psetttings = {};
+	psetttings.show_address = false;
+	psetttings.show_timings = false;
 
 	for (int opt = 1; opt < argc - 1; ++opt)
 	{
 		if (strcmp(argv[opt], "--bin") == 0)
 			is_tos = false;
+		else if (strcmp(argv[opt], "--address") == 0)
+			psetttings.show_address = true;
+		else if (strcmp(argv[opt], "--timings") == 0)
+			psetttings.show_timings = true;
+		else
+		{
+			fprintf(stderr, "Unknown switch: '%s'\n", argv[opt]);
+			return 1;
+		}
 	}
 
 	const char* fname = argv[argc - 1];
@@ -638,7 +659,7 @@ int main(int argc, char** argv)
 	fclose(pInfile);
 
 	if (is_tos)
-		return process_tos_file(pData, size, stdout);
+		return process_tos_file(pData, size, psetttings, stdout);
 	else
-		return process_bin_file(pData, size, stdout);
+		return process_bin_file(pData, size, psetttings, stdout);
 }
