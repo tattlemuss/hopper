@@ -14,36 +14,36 @@
 	move	usp,a7
 	move	a1,usp
 	trap	#$e
-	move	(a7)+,sr
-	move	$1010.l,sr
-	move	$1010.w,sr
-	move	sr,-(a7)
-	move	sr,4(a7,d7.l)
-	nbcd	(a1)+
+	move.w	(a7)+,sr
+	move.w	$1010.l,sr
+	move.w	$1010.w,sr
+	move.w	sr,-(a7)
+	move.w	sr,4(a7,d7.l)
+	nbcd.b	(a1)+
 	pea	4(a7)
 	pea $1234.w
-	pea $0cafebad
+	pea $cafebad.l
 	pea (a0)
 	lea 1235(a0),a7
 	lea -35(a6,d7.w),a7
 	tas	3(a7,d7.w)
 	jsr	(a3)
-    jsr label
-    jsr $7ba0.w
+	jsr label
+	jsr $7ba0.w
 	jmp	5(a3)
-    jmp loop2
+	jmp loop2
 	jsr	label
 	jmp	loop1
-    jmp -5(a2,d7.l)
-	asl	(a2)
-	asl	label
-	asr	label+2
-	asl	label
-	asr	label+2
-        or.l    loop1(pc),d7
-        or.l    loop1(pc,d7.w),d7
-	asr	-(a2)
-	bchg	#$3,(a7)
+	jmp -5(a2,d7.l)
+	asl.w	(a2)
+	asl.w	label
+	asr.w	label+2
+	asl.w	label
+	asr.w	label+2
+	or.l	loop1(pc),d7
+	or.l	loop1(pc,d7.w),d7
+	asr.w	-(a2)
+	bchg.b	#$3,(a7)
 loop1:
 	movem.l	d0-d6,-(a7)
 	movem.l	d0/d2/d4/a0/a2/a5,-(a7)
@@ -65,7 +65,8 @@ loop1:
 	eori.l	#$12345678,(a7)
 	cmpi.l	#$12345678,(a7)
 	negx.b	(a7)
-        negx    d0
+	negx.w	d0
+	negx.l	d0
 	negx.w	(a7)
 	negx.l	(a7)
 	clr.b	-(a7)
@@ -91,7 +92,8 @@ loop1:
 	bclr	d1,(a5)+
 	bset	d2,(a6)+
 	btst	d3,(a7)+
-	dbra	d7,loop1
+	dbmi	d7,loop1
+	dbge	d7,loop1
 	dbf	d1,loop1
 	dbge	d2,loop1
 	st	4(a7)
@@ -165,23 +167,23 @@ loop2:
 	roxl.w	#$3,d1
 	rol.w	#$3,d1
 	ror.w	#$3,d1
-        chk.w	(a7),d7
-        divu.w	d2,d7
-        divu.w	3000(a7),d7
-        movea.w	(a7)+,a7
-        movea.w	10(a7),a7
-        movea.l	(a7)+,a7
-        movea.l	10(a7),a7
-        exg	d0,d7
-        exg	a0,a7
-        exg	d0,a7
-        move	#$2700,sr
-        ori	#$700,sr
-        andi	#$1234,sr
-        move	#$ff,ccr
-        move	(a7)+,ccr
-       	ori	#$ff,ccr
-        andi	#$ff,ccr
+	chk.w	(a7),d7
+	divu.w	d2,d7
+	divu.w	3000(a7),d7
+	movea.w	(a7)+,a7
+	movea.w	10(a7),a7
+	movea.l	(a7)+,a7
+	movea.l	10(a7),a7
+	exg	d0,d7
+	exg	a0,a7
+	exg	d0,a7
+	move.w	#$2700,sr
+	ori	#$700,sr
+	andi	#$1234,sr
+	move	#$ff,ccr
+	move	(a7)+,ccr
+	ori	#$ff,ccr
+	andi	#$ff,ccr
 	cmpa.l	d2,a0
 	cmpa.l	4(a0),a1
 	suba.l	d2,a0
@@ -189,10 +191,10 @@ loop2:
 	adda.l	d2,a0
 	addx.l	d2,d4
 	subx.l	d2,d1
-	ror	(a0)
-	rol	4(a0)
-	roxr	(a0,d0.w)
-	roxl	$1234
+	ror.w	(a0)
+	rol.w	4(a0)
+	roxr.w	0(a0,d0.w)
+	roxl.w	$1234.l
 
 
 label:	ds.w	1
