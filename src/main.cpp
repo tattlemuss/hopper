@@ -173,7 +173,7 @@ public:
 	std::vector<line>    lines;
 };
 
-int decode_buf(buffer_reader& buf, const symbols& symbols, disassembly& disasm)
+int decode_buf(buffer_reader& buf, const decode_settings& dsettings, const symbols& symbols, disassembly& disasm)
 {
 	while (buf.get_remain() >= 2)
 	{
@@ -182,7 +182,7 @@ int decode_buf(buffer_reader& buf, const symbols& symbols, disassembly& disasm)
 
 		// decode uses a copy of the buffer state
 		buffer_reader buf_copy(buf);
-		int res = decode(buf_copy, line.inst);
+		int res = decode(buf_copy, dsettings, line.inst);
 
 		// Handle failure
 		disasm.lines.push_back(line);
@@ -542,7 +542,7 @@ int read_symbols(buffer_reader& buf, const tos_header& header, symbols& symbols)
 }
 
 // ----------------------------------------------------------------------------
-int process_tos_file(const uint8_t* pData, long size, const print_settings& psettings, FILE* pOutput)
+int process_tos_file(const uint8_t* pData, long size, const decode_settings& dsettings, const print_settings& psettings, FILE* pOutput)
 {
 	buffer_reader buf(pData, size, 0);
 	tos_header header = {};
@@ -587,7 +587,7 @@ int process_tos_file(const uint8_t* pData, long size, const print_settings& pset
 	int ret = read_symbols(symbol_buf, header, exe_symbols);
 
 	disassembly disasm;
-	if (decode_buf(text_buf, exe_symbols, disasm))
+	if (decode_buf(text_buf, dsettings, exe_symbols, disasm))
 		return 1;
 
 	add_reference_symbols(disasm, exe_symbols);
@@ -597,13 +597,13 @@ int process_tos_file(const uint8_t* pData, long size, const print_settings& pset
 }
 
 // ----------------------------------------------------------------------------
-int process_bin_file(const uint8_t* pData, long size, const print_settings& psettings, FILE* pOutput)
+int process_bin_file(const uint8_t* pData, long size, const decode_settings& dsettings, const print_settings& psettings, FILE* pOutput)
 {
 	buffer_reader buf(pData, size, 0);
 	symbols bin_symbols;
 
 	disassembly disasm;
-	if (decode_buf(buf, bin_symbols, disasm))
+	if (decode_buf(buf, dsettings, bin_symbols, disasm))
 		return 1;
 
 	add_reference_symbols(disasm, bin_symbols);
@@ -622,18 +622,27 @@ int main(int argc, char** argv)
 	}
 
 	bool is_tos = true;
-	print_settings psetttings = {};
-	psetttings.show_address = false;
-	psetttings.show_timings = false;
+	print_settings psettings = {};
+	psettings.show_address = false;
+	psettings.show_timings = false;
+
+	decode_settings dsettings = {};
+	dsettings.cpu_type = CPU_TYPE_68000;
 
 	for (int opt = 1; opt < argc - 1; ++opt)
 	{
 		if (strcmp(argv[opt], "--bin") == 0)
 			is_tos = false;
 		else if (strcmp(argv[opt], "--address") == 0)
-			psetttings.show_address = true;
+			psettings.show_address = true;
 		else if (strcmp(argv[opt], "--timings") == 0)
-			psetttings.show_timings = true;
+			psettings.show_timings = true;
+		else if (strcmp(argv[opt], "--m68010") == 0)
+			dsettings.cpu_type = CPU_TYPE_68010;
+		else if (strcmp(argv[opt], "--m68020") == 0)
+			dsettings.cpu_type = CPU_TYPE_68020;
+		else if (strcmp(argv[opt], "--m68030") == 0)
+			dsettings.cpu_type = CPU_TYPE_68030;
 		else
 		{
 			fprintf(stderr, "Unknown switch: '%s'\n", argv[opt]);
@@ -659,7 +668,7 @@ int main(int argc, char** argv)
 	fclose(pInfile);
 
 	if (is_tos)
-		return process_tos_file(pData, size, psetttings, stdout);
+		return process_tos_file(pData, size, dsettings, psettings, stdout);
 	else
-		return process_bin_file(pData, size, psetttings, stdout);
+		return process_bin_file(pData, size, dsettings, psettings, stdout);
 }
