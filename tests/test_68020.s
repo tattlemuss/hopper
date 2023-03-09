@@ -37,4 +37,4 @@ L1:
 
 	bkpt #$4
 	move.w ccr,(a0)
-	movem a0,-(a0)
+	rtd #-$100

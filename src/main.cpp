@@ -99,6 +99,7 @@ const char* instruction_names[Opcode::COUNT] =
 	"ror",
 	"roxl",
 	"roxr",
+	"rtd",
 	"rte",
 	"rtr",
 	"rts",
@@ -465,7 +466,10 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 			print_indexed_68020(operand.indirect_index_68020, symbols, -1, -1, inst_address, pFile);
 			return;
 		case OpType::IMMEDIATE:
-			fprintf(pFile, "#$%x", operand.imm.val0);
+			if (operand.imm.is_signed && (int32_t)operand.imm.val0 < 0)
+				fprintf(pFile, "#-$%x", -(int32_t)operand.imm.val0);
+			else
+				fprintf(pFile, "#$%x", operand.imm.val0);
 			return;
 		case OpType::SR:
 			fprintf(pFile, "sr");

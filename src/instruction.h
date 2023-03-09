@@ -94,6 +94,7 @@ enum Opcode
 	ROR,
 	ROXL,
 	ROXR,
+	RTD,
 	RTE,
 	RTR,
 	RTS,
@@ -229,6 +230,7 @@ struct operand
 		{
 			Size		size;		// byte, word or long
 			uint32_t	val0;
+			bool		is_signed;
 		} imm;
 
 		struct

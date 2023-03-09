@@ -14,6 +14,7 @@ void set_imm_byte(operand& op, uint8_t val)
 	op.type = OpType::IMMEDIATE;
 	op.imm.size = Size::BYTE;
 	op.imm.val0 = val;
+	op.imm.is_signed = false;
 }
 
 void set_imm_word(operand& op, uint16_t val)
@@ -21,6 +22,15 @@ void set_imm_word(operand& op, uint16_t val)
 	op.type = OpType::IMMEDIATE;
 	op.imm.size = Size::WORD;
 	op.imm.val0 = val;
+	op.imm.is_signed = false;
+}
+
+void set_imm_word_signed(operand& op, int16_t val)
+{
+	op.type = OpType::IMMEDIATE;
+	op.imm.size = Size::WORD;
+	op.imm.val0 = val;
+	op.imm.is_signed = true;
 }
 
 void set_imm_long(operand& op, uint32_t val)
@@ -28,6 +38,7 @@ void set_imm_long(operand& op, uint32_t val)
 	op.type = OpType::IMMEDIATE;
 	op.imm.size = Size::LONG;
 	op.imm.val0 = val;
+	op.imm.is_signed = false;
 }
 
 void set_dreg(operand& op, uint8_t reg)
@@ -851,6 +862,16 @@ int Inst_stop(buffer_reader& buffer, const decode_settings& dsettings, instructi
 }
 
 // ----------------------------------------------------------------------------
+int Inst_rtd(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t /*header*/)
+{
+	uint16_t val;
+	if (buffer.read_word(val))
+		return 1;
+	set_imm_word_signed(inst.op0, (int16_t)val);
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
 // Instructions without any operands
 int Inst_simple(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/, instruction& /*inst*/, uint32_t /*header*/)
 {
@@ -884,8 +905,7 @@ int Inst_link_w(buffer_reader& buffer, const decode_settings& dsettings, instruc
 	if (buffer.read_word(disp))
 		return 1;
 
-	// NO CHECK unsigned
-	set_imm_word(inst.op1, disp);
+	set_imm_word_signed(inst.op1, (int16_t)disp);
 	return 0;
 }
 
@@ -1385,6 +1405,8 @@ const matcher_entry g_matcher_table_0100[] =
 	MATCH_ENTRY1_IMPL(0,16,0b0100111001110110,		CPU_MIN_68000, TRAPV,		Inst_simple ),
 	MATCH_ENTRY1_IMPL(0,16,0b0100111001110111,		CPU_MIN_68000, RTR,			Inst_simple ),
 	MATCH_ENTRY1_IMPL(0,16,0b0100111001110010,		CPU_MIN_68000, STOP,		Inst_stop ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110100,		CPU_MIN_68010, RTD,			Inst_rtd ),
+
 	MATCH_ENTRY1_IMPL(3,13,0b0100100001001,			CPU_MIN_68010, BKPT,		Inst_bkpt ),
 	MATCH_ENTRY1_IMPL(3,13,0b0100100001000,			CPU_MIN_68000, SWAP,		Inst_swap ),
 	MATCH_ENTRY1_IMPL(3,13,0b0100111001010,			CPU_MIN_68000, LINK,		Inst_link_w ),
