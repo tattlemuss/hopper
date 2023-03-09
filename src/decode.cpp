@@ -8,8 +8,8 @@
 // ----------------------------------------------------------------------------
 //	INSTRUCTION DECODE
 // ----------------------------------------------------------------------------
-// Set functions to correctly handle operand union data
-void set_imm_byte(operand& op, uint8_t val)
+// Various functions to cleanly handle operand union data
+static void set_imm_byte(operand& op, uint8_t val)
 {
 	op.type = OpType::IMMEDIATE;
 	op.imm.size = Size::BYTE;
@@ -17,7 +17,7 @@ void set_imm_byte(operand& op, uint8_t val)
 	op.imm.is_signed = false;
 }
 
-void set_imm_word(operand& op, uint16_t val)
+static void set_imm_word(operand& op, uint16_t val)
 {
 	op.type = OpType::IMMEDIATE;
 	op.imm.size = Size::WORD;
@@ -25,7 +25,7 @@ void set_imm_word(operand& op, uint16_t val)
 	op.imm.is_signed = false;
 }
 
-void set_imm_word_signed(operand& op, int16_t val)
+static void set_imm_word_signed(operand& op, int16_t val)
 {
 	op.type = OpType::IMMEDIATE;
 	op.imm.size = Size::WORD;
@@ -33,7 +33,7 @@ void set_imm_word_signed(operand& op, int16_t val)
 	op.imm.is_signed = true;
 }
 
-void set_imm_long(operand& op, uint32_t val)
+static void set_imm_long(operand& op, uint32_t val)
 {
 	op.type = OpType::IMMEDIATE;
 	op.imm.size = Size::LONG;
@@ -41,25 +41,33 @@ void set_imm_long(operand& op, uint32_t val)
 	op.imm.is_signed = false;
 }
 
-void set_dreg(operand& op, uint8_t reg)
+static void set_dreg(operand& op, uint8_t reg)
 {
 	op.type = OpType::D_DIRECT;
 	op.d_register.reg = reg;
 }
 
-void set_areg(operand& op, uint8_t reg)
+static void set_areg(operand& op, uint8_t reg)
 {
 	op.type = OpType::A_DIRECT;
 	op.a_register.reg = reg;
 }
 
-void set_predec(operand& op, uint8_t reg)
+static void set_d_or_a_reg(operand& op, uint8_t d_or_a, uint8_t reg)
+{
+	if (d_or_a)
+		set_areg(op, reg);
+	else
+		set_dreg(op, reg);
+}
+
+static void set_predec(operand& op, uint8_t reg)
 {
 	op.type = OpType::INDIRECT_PREDEC;
 	op.indirect_predec.reg = reg;
 }
 
-void set_postinc(operand& op, uint8_t reg)
+static void set_postinc(operand& op, uint8_t reg)
 {
 	op.type = OpType::INDIRECT_POSTINC;
 	op.indirect_postinc.reg = reg;
@@ -796,6 +804,33 @@ int Inst_btst_imm(buffer_reader& buffer, const decode_settings& dsettings, instr
 }
 
 // ----------------------------------------------------------------------------
+int Inst_moves(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+{
+	uint8_t size = (header >> 6) & 3;
+	uint8_t mode = (header >> 3) & 7;
+	uint8_t reg  = (header >> 0) & 7;
+	Size sizes[] = { Size::BYTE, Size::WORD, Size::LONG, Size::NONE };
+	Size ea_size = sizes[size];
+	if (ea_size == Size::NONE)
+		return 1;
+
+	uint16_t val;
+	if (buffer.read_word(val))
+		return 1;
+
+	uint8_t d_or_a  = (val >> 15) & 1;
+	uint8_t reg2  = (val >> 12) & 7;
+	uint8_t dr  = (val >> 11) & 1;
+	operand& op_ea = (dr) ? inst.op1 : inst.op0;
+	operand& op_reg = (dr) ? inst.op0 : inst.op1;
+
+	inst.suffix = size_to_suffix(ea_size);
+	set_d_or_a_reg(op_reg, d_or_a, reg2);
+	int ret = decode_ea(buffer, dsettings, op_ea, ea_group::ALT, mode, reg, ea_size, inst.address);
+	return ret;
+}
+
+// ----------------------------------------------------------------------------
 // bchg, bset, bclr, btst
 int Inst_bchg(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
 {
@@ -933,10 +968,7 @@ int Inst_movec (buffer_reader& buffer, const decode_settings& dsettings, instruc
 	op_cr.type = OpType::CONTROL_REGISTER;
 	op_cr.control_register.cr = ctrl;
 
-	if (d_or_a)
-		set_areg(op_reg, reg_index);
-	else
-		set_dreg(op_reg, reg_index);
+	set_d_or_a_reg(op_reg, d_or_a, reg_index);
 	return 0;
 }
 
@@ -1436,6 +1468,7 @@ const matcher_entry g_matcher_table_0000[] =
 	MATCH_ENTRY1_IMPL(8,8,0b00000110,				CPU_MIN_68000, ADDI,		Inst_integer_imm_ea ),
 	MATCH_ENTRY1_IMPL(8,8,0b00001010,				CPU_MIN_68000, EORI,		Inst_integer_imm_ea ),
 	MATCH_ENTRY1_IMPL(8,8,0b00001100,				CPU_MIN_68000, CMPI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00001110,				CPU_MIN_68010, MOVES,		Inst_moves ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b101,		CPU_MIN_68000, BCHG,		Inst_bchg ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b110,		CPU_MIN_68000, BCLR,		Inst_bchg ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b111,		CPU_MIN_68000, BSET,		Inst_bchg ),

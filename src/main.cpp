@@ -85,6 +85,7 @@ const char* instruction_names[Opcode::COUNT] =
 	"movem",
 	"movep",
 	"moveq",
+	"moves",
 	"muls",
 	"mulu",
 	"nbcd",

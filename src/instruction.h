@@ -80,6 +80,7 @@ enum Opcode
 	MOVEM,
 	MOVEP,
 	MOVEQ,
+	MOVES,
 	MULS,
 	MULU,
 	NBCD,

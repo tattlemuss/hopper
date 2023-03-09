@@ -34,11 +34,9 @@ L1:
 	move.w ([$2000,a7]),d0
 	move.w ([$64]),d0
 	jmp ([d7.l])
-
 	bkpt #$4
 	move.w ccr,(a0)
 	rtd #-$100
-
 	movec	sfc,d0
 	movec	dfc,d2
 	movec	usp,d4
@@ -55,3 +53,7 @@ L1:
 	movec	a2,caar
 	movec	a4,msp
 	movec	a6,isp
+	moves.w a0,(a1)
+	moves.w -(a5),d3
+	moves.w ([$100,a0],d1.w),d0
+	moves.w a5,([$100,a0,a3.w*4])
