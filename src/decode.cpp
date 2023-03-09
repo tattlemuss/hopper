@@ -105,6 +105,51 @@ uint8_t decode_operand_type(uint8_t mode_bits, uint8_t reg_bits)
 	return 7 + 5;
 }
 
+OpType g_full_extension_word_optypes[16] =
+{
+	// I/IS "Index/Indirect Selection"
+
+	// Index register used (IS==0)
+	NO_MEMORY_INDIRECT,		// 0 000 No Memory Indirect Action (bd,BR,ir with no "[]" lookup)
+	INDIRECT_PREINDEXED,	// 0 001 Indirect Preindexed with Null Outer Displacement ([bd,BR,ir])
+	INDIRECT_PREINDEXED,	// 0 010 Indirect Preindexed with Word Outer Displacement ([bd,BR,ir].od)
+	INDIRECT_PREINDEXED,	// 0 011 Indirect Preindexed with Long Outer Displacement ([bd,BR,ir].od)
+	INVALID,				// 0 100
+	INDIRECT_POSTINDEXED,	// 0 101 Indirect Postindexed with Null Outer Displacement ([bd,BR],ir)
+	INDIRECT_POSTINDEXED,	// 0 110 Indirect Postindexed with Word Outer Displacement ([bd,BR],ir.od)
+	INDIRECT_POSTINDEXED,	// 0 111 Indirect Postindexed with Long Outer Displacement ([bd,BR],ir.od)
+
+	// No Index registers (IS==1)
+	NO_MEMORY_INDIRECT,		// 1 000 No Memory Indirect Action (bd,BR with no "[]" lookup) -- no Index Register
+	MEMORY_INDIRECT,		// 1 001 Memory Indirect with Null Outer Displacement ([bd,BR])
+	MEMORY_INDIRECT,		// 1 010 Memory Indirect with Word Outer Displacement ([bd,BR].od)
+	MEMORY_INDIRECT,		// 1 011 Memory Indirect with Long Outer Displacement ([bd,BR].od)
+	INVALID,				// 1 100
+	INVALID,				// 1 101
+	INVALID,				// 1 110
+	INVALID,				// 1 111
+};
+
+Size g_full_extension_outer_displacement_size[16] =
+{
+	Size::NONE,				// 0 000
+	Size::NONE,				// 0 001
+	Size::WORD,				// 0 010
+	Size::LONG,				// 0 011
+	Size::NONE,				// 0 100
+	Size::NONE,				// 0 101
+	Size::WORD,				// 0 110
+	Size::LONG,				// 0 111
+	Size::NONE,				// 1 000
+	Size::NONE,				// 1 001
+	Size::WORD,				// 1 010
+	Size::LONG,				// 1 011
+	Size::NONE,				// 1 100
+	Size::NONE,				// 1 101
+	Size::NONE,				// 1 110
+	Size::NONE,				// 1 111
+};
+
 // ----------------------------------------------------------------------------
 // Split 16 bit raw displacement into signed 8-bit offset, register reg_number and size
 // e.g n(pc,d0.w) or n(a0,d0.w)
@@ -118,12 +163,106 @@ void decode_brief_extension_word(uint16_t word, int cpu_type, int8_t& disp, inde
 	if (cpu_type >= CPU_TYPE_68020)
 		info.scale_shift = ((word >> 9) & 3);
 
-	info.index_reg.reg_number = (word >> 12) & 7;
-	info.index_reg.register_type = 0;
-	if (cpu_type >= CPU_TYPE_68020)
-		info.index_reg.register_type = (word >> 15) & 1;
+	uint8_t reg_number = (word >> 12) & 7;
+	uint8_t d_or_a = (word >> 15) & 1;
+	if (cpu_type >= CPU_TYPE_68020 && d_or_a)
+		info.index_reg = (IndexRegister)(INDEX_REG_A0 + reg_number);
+	else
+		info.index_reg = (IndexRegister)(INDEX_REG_D0 + reg_number);
 }
 
+// ----------------------------------------------------------------------------
+int decode_full_extension_word(buffer_reader& buffer, int cpu_type, uint16_t word, 	uint32_t pc_relative_adjust,
+								 operand& op_result)
+{
+	// Decode basic fields
+	uint8_t bs = (word >> 7) & 1;				// Base register suppress
+	uint8_t is = (word >> 6) & 1;				// Index regsiter suppress
+	uint8_t bd_size = (word >> 4) & 3;			// Size of base displacement
+	uint8_t i_is = (word >> 0) & 7;				// Indirect type (pre/post)
+
+	// Generate a lookup for the tables of mode/size
+	uint8_t lookup = (is << 3) | i_is;
+
+	// Set the overall operand type
+	op_result.type = g_full_extension_word_optypes[lookup];
+
+	indirect_index_full* full_result = &op_result.indirect_index_68020;
+
+	// Suppress base regs first
+	full_result->used[1] = (!bs);
+	full_result->used[2] = (!is);
+	// Make the registers consistent
+	if (bs)
+		full_result->base_register = INDEX_REG_NONE;
+	if (is)
+		full_result->index.index_reg = INDEX_REG_NONE;
+
+	//printf("BS:%d IS:%d BDSIZE:%d I_IS:%d lookup:%d\n", bs, is, bd_size, i_is, lookup);
+
+	// Read base displacement (0-2 words)
+	full_result->base_displacement = 0;
+	full_result->used[0] = false;
+	if (bd_size == 2)
+	{
+		uint16_t val;
+		if (buffer.read_word(val))
+			return 1;
+		full_result->base_displacement += (int16_t)val;
+		full_result->used[0] = true;
+	}
+	else if (bd_size == 3)
+	{
+		uint32_t val;
+		if (buffer.read_long(val))
+			return 1;
+		full_result->base_displacement += (int32_t)val;
+		full_result->used[0] = true;
+	}
+	else if (bd_size == 0)
+	{
+		return 1;
+	}
+
+	// If this is a pc-relative displacement, adjust from the start of the instruction
+	// *after* we have read the data
+	if (full_result->base_register == IndexRegister::INDEX_REG_PC)
+		full_result->base_displacement += pc_relative_adjust;
+
+	// Read outer displacement (0-2 words)
+	Size outer_size = g_full_extension_outer_displacement_size[lookup];
+	full_result->outer_displacement = 0;
+	full_result->used[3] = false;
+	if (outer_size == Size::WORD)
+	{
+		uint16_t val;
+		if (buffer.read_word(val))
+			return 1;
+		full_result->outer_displacement = (int16_t)val;
+		full_result->used[3] = true;
+	}
+	else if (outer_size == Size::LONG)
+	{
+		uint32_t val;
+		if (buffer.read_long(val))
+			return 1;
+		full_result->outer_displacement = (int32_t)val;
+		full_result->used[3] = true;
+	}
+	else if (outer_size != Size::NONE)
+	{
+		return 1;
+	}
+
+	// Decode shared parts for the index register
+	index_indirect brief;
+	int8_t disp;
+	decode_brief_extension_word(word, cpu_type, disp, brief);
+	full_result->index = brief;
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
 int read_immediate(buffer_reader& buffer, operand& operand, Size size)
 {
 	uint16_t val16;
@@ -180,14 +319,14 @@ int decode_ea(buffer_reader& buffer, const decode_settings& dsettings, operand& 
 		INDIRECT_POSTINC,	// (An) +	  011 reg. number:An
 		INDIRECT_PREDEC,	// – (An)	  100 reg. number:An
 		INDIRECT_DISP,	    // (d16,An)   101 reg. number:An
-		INDIRECT_INDEX,	    // (d8,An,Xn) 110 reg. number:An
+		INDIRECT_INDEX,	    // (d8,An,Xn) 110 reg. number:An Can be replaced by 68020 mode
 
 		// 7 in "mode" bits, 0-4 in reg bits
 		//                                  mode reg
 		ABSOLUTE_WORD,      // (xxx).W      111 000
 		ABSOLUTE_LONG,      // (xxx).L      111 001
 		PC_DISP,		    // (d16,PC)     111 010
-		PC_DISP_INDEX,      // (d8,PC,Xn)   111 011
+		PC_DISP_INDEX,      // (d8,PC,Xn)   111 011. number:An Can be replaced by 68020 mode
 		IMMEDIATE,          // <data>       111 100
 		INVALID,
 	};
@@ -234,17 +373,27 @@ int decode_ea(buffer_reader& buffer, const decode_settings& dsettings, operand& 
 			return 0;
 
 		case OpType::INDIRECT_INDEX:
-			operand.indirect_index.a_reg = reg_bits;
+		{
 			if (buffer.read_word(val16))
 				return 1;
-
-			// The result depends on the extension word bit 8!
-			decode_brief_extension_word(val16,
-				dsettings.cpu_type,
-				operand.indirect_index.disp,
-				operand.indirect_index.indirect_info);
+			uint8_t full_extension_bit = ((val16 >> 8) & 1);
+			if ((dsettings.cpu_type >= CPU_TYPE_68020) && full_extension_bit)
+			{
+				// This can be overridden (set to "none") by the following call
+				operand.indirect_index_68020.base_register = (IndexRegister)(INDEX_REG_A0 + reg_bits);
+				// extended 68020 modes with full extension word.
+				if (decode_full_extension_word(buffer, dsettings.cpu_type, val16, 0, operand))
+					return 1;
+			}
+			else
+			{
+				// The result depends on the extension word bit 8!
+				operand.indirect_index.a_reg = reg_bits;
+				decode_brief_extension_word(val16, dsettings.cpu_type, operand.indirect_index.disp,
+					operand.indirect_index.indirect_info);
+			}
 			return 0;
-
+		}
 		case OpType::ABSOLUTE_WORD:
 			if (buffer.read_word(val16))
 				return 1;
@@ -268,11 +417,19 @@ int decode_ea(buffer_reader& buffer, const decode_settings& dsettings, operand& 
 		case OpType::PC_DISP_INDEX:
 			if (buffer.read_word(val16))
 				return 1;
-			decode_brief_extension_word(val16,
-				dsettings.cpu_type,
-				disp8,
-				operand.pc_disp_index.indirect_info);
-			operand.pc_disp_index.inst_disp = read_address - inst_address + disp8;
+			if ((dsettings.cpu_type >= CPU_TYPE_68020) && ((val16 >> 8) & 1))
+			{
+				// This can be overridden (set to "none") by the following call
+				operand.indirect_index_68020.base_register = INDEX_REG_PC;
+				// extended 68020 modes with full extension word.
+				if (decode_full_extension_word(buffer, dsettings.cpu_type, val16, read_address - inst_address, operand))
+					return 1;
+			}
+			else
+			{
+				decode_brief_extension_word(val16, dsettings.cpu_type, disp8, operand.pc_disp_index.indirect_info);
+				operand.pc_disp_index.inst_disp = read_address - inst_address + disp8;
+			}
 			return 0;
 
 		case OpType::IMMEDIATE:
@@ -694,6 +851,14 @@ int Inst_swap(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, i
 {
 	uint8_t reg = (header >> 0) & 7;
 	set_dreg(inst.op0, reg);
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
+int Inst_bkpt(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+{
+	uint8_t vec = (header >> 0) & 7;
+	set_imm_byte(inst.op0, vec);
 	return 0;
 }
 
@@ -1120,223 +1285,211 @@ typedef int (*pfnDecoderFunc)(buffer_reader& buffer, const decode_settings& dset
 //
 //	Entries go in the order Most specific -> Least Specific
 //	i.e. they should go in terms of decreasing "CT" i.e. bitcount
-
-// TODO switch tag to an instruction type
 struct matcher_entry
 {
-	uint32_t		mask0;
-	uint32_t		val0;
+	uint32_t		mask;			// mask before comparator (can be combined)
+	uint32_t		val;			// comparator value
+	uint32_t		cpu_mask;		// bitmask of CPU_TYPEs this instruction is valid for
 	Opcode			opcode;
 	pfnDecoderFunc	func;
 };
 
-#define MATCH_ENTRY1_IMPL(shift, bitcount, val, tag, func)   \
-	{ (((1U<<(bitcount))-1U)<<(shift)), (val<<(shift)), Opcode::tag, func }
+#define MATCH_ENTRY1_IMPL(shift, bitcount, val, cpu, tag, func)   \
+	{ (((1U<<(bitcount))-1U)<<(shift)), (val<<(shift)), cpu, Opcode::tag, func }
 
-#define MATCH_ENTRY2_IMPL(shift, bitcount, val, shift2, bitcount2, val2, tag, func)   \
+#define MATCH_ENTRY2_IMPL(shift, bitcount, val, shift2, bitcount2, val2, cpu, tag, func)   \
 	{ (((1U<<(bitcount))-1U)<<(shift)) | (((1U<<(bitcount2))-1U)<<(shift2)), \
 		(val<<(shift)) | (val2<<(shift2)), \
-	   Opcode::tag, func }
+		cpu, Opcode::tag, func }
 
-#define MATCH_ENTRY3_IMPL(shift, bitcount, val, shift2, bitcount2, val2, shift3, bitcount3, val3, tag, func)   \
+#define MATCH_ENTRY3_IMPL(shift, bitcount, val, shift2, bitcount2, val2, shift3, bitcount3, val3, cpu, tag, func)   \
 	{ (((1U<<(bitcount))-1U)<<(shift)) | (((1U<<(bitcount2))-1U)<<(shift2))  | (((1U<<(bitcount3))-1U)<<(shift3)), \
 		(val<<(shift)) | (val2<<(shift2)) | (val3<<(shift3)), \
-	   Opcode::tag, func }
+	   cpu, Opcode::tag, func }
 
-#define MATCH_END		{ 0, 0, Opcode::COUNT, NULL}
+#define MATCH_END		{ 0, 0, 0, Opcode::COUNT, NULL}
+
+#define CPU_MIN_68000			(1<<CPU_TYPE_68000)|(1<<CPU_TYPE_68010)|(1<<CPU_TYPE_68020)|(1<<CPU_TYPE_68030)
+#define CPU_MIN_68010			                    (1<<CPU_TYPE_68010)|(1<<CPU_TYPE_68020)|(1<<CPU_TYPE_68030)
+#define CPU_MIN_68020			                                        (1<<CPU_TYPE_68020)|(1<<CPU_TYPE_68030)
 
 const matcher_entry g_matcher_table_0000[] =
 {
-	//		          SH CT							Tag				  Decoder
-	MATCH_ENTRY1_IMPL(0,16,0b0000101001111100,		EORI,		Inst_imm_sr ), // supervisor
-	MATCH_ENTRY1_IMPL(0,16,0b0000001000111100,		ANDI,		Inst_imm_ccr ),
-	MATCH_ENTRY1_IMPL(0,16,0b0000101000111100,		EORI,		Inst_imm_ccr ),
-	MATCH_ENTRY1_IMPL(0,16,0b0000000000111100,		ORI,		Inst_imm_ccr ),
-	MATCH_ENTRY1_IMPL(0,16,0b0000000001111100,		ORI,		Inst_imm_sr ), // supervisor
-	MATCH_ENTRY1_IMPL(0,16,0b0000001001111100,		ANDI,		Inst_imm_sr ), // supervisor
-
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b100001,	MOVEP,		Inst_movep_mem_reg ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b101001,	MOVEP,		Inst_movep_mem_reg ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b110001,	MOVEP,		Inst_movep_reg_mem ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b111001,	MOVEP,		Inst_movep_reg_mem ),
-	MATCH_ENTRY1_IMPL(6,10,0b0000100001,			BCHG,		Inst_bchg_imm ),
-	MATCH_ENTRY1_IMPL(6,10,0b0000100010,			BCLR,		Inst_bchg_imm ),
-	MATCH_ENTRY1_IMPL(6,10,0b0000100011,			BSET,		Inst_bchg_imm ),
-	MATCH_ENTRY1_IMPL(6,10,0b0000100000,			BTST,		Inst_btst_imm ),
-
-	MATCH_ENTRY1_IMPL(8,8,0b00000000,				ORI,		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00000010,				ANDI,		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00000100,				SUBI,		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00000110,				ADDI,		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00001010,				EORI,		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00001100,				CMPI,		Inst_integer_imm_ea ),
-
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b101,		BCHG,		Inst_bchg ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b110,		BCLR,		Inst_bchg ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b111,		BSET,		Inst_bchg ),
-	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b100,		BTST,		Inst_btst ),
-
-	MATCH_ENTRY1_IMPL(12,4,0b0000,					MOVE,		Inst_move ),
+	//		          SH CT							CPU				Tag				  Decoder
+	MATCH_ENTRY1_IMPL(0,16,0b0000101001111100,		CPU_MIN_68000, EORI,		Inst_imm_sr ), // supervisor
+	MATCH_ENTRY1_IMPL(0,16,0b0000001000111100,		CPU_MIN_68000, ANDI,		Inst_imm_ccr ),
+	MATCH_ENTRY1_IMPL(0,16,0b0000101000111100,		CPU_MIN_68000, EORI,		Inst_imm_ccr ),
+	MATCH_ENTRY1_IMPL(0,16,0b0000000000111100,		CPU_MIN_68000, ORI,			Inst_imm_ccr ),
+	MATCH_ENTRY1_IMPL(0,16,0b0000000001111100,		CPU_MIN_68000, ORI,			Inst_imm_sr ), // supervisor
+	MATCH_ENTRY1_IMPL(0,16,0b0000001001111100,		CPU_MIN_68000, ANDI,		Inst_imm_sr ), // supervisor
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b100001,	CPU_MIN_68000, MOVEP,		Inst_movep_mem_reg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b101001,	CPU_MIN_68000, MOVEP,		Inst_movep_mem_reg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b110001,	CPU_MIN_68000, MOVEP,		Inst_movep_reg_mem ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b111001,	CPU_MIN_68000, MOVEP,		Inst_movep_reg_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000100001,			CPU_MIN_68000, BCHG,		Inst_bchg_imm ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000100010,			CPU_MIN_68000, BCLR,		Inst_bchg_imm ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000100011,			CPU_MIN_68000, BSET,		Inst_bchg_imm ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000100000,			CPU_MIN_68000, BTST,		Inst_btst_imm ),
+	MATCH_ENTRY1_IMPL(8,8,0b00000000,				CPU_MIN_68000, ORI,			Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00000010,				CPU_MIN_68000, ANDI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00000100,				CPU_MIN_68000, SUBI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00000110,				CPU_MIN_68000, ADDI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00001010,				CPU_MIN_68000, EORI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b00001100,				CPU_MIN_68000, CMPI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b101,		CPU_MIN_68000, BCHG,		Inst_bchg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b110,		CPU_MIN_68000, BCLR,		Inst_bchg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b111,		CPU_MIN_68000, BSET,		Inst_bchg ),
+	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b100,		CPU_MIN_68000, BTST,		Inst_btst ),
+	MATCH_ENTRY1_IMPL(12,4,0b0000,					CPU_MIN_68000, MOVE,		Inst_move ),
 	MATCH_END
 };
 
 const matcher_entry g_matcher_table_0001[] =
 {
-	MATCH_ENTRY1_IMPL(12,4,0b0001,					MOVE,		Inst_move ),
+	MATCH_ENTRY1_IMPL(12,4,0b0001,					CPU_MIN_68000, MOVE,		Inst_move ),
 	MATCH_END
 };
 
 const matcher_entry g_matcher_table_0010[] =
 {
-	MATCH_ENTRY2_IMPL(12,4,0b0010, 6,3,0b001,		MOVEA,		Inst_movea ),
-	MATCH_ENTRY1_IMPL(12,4,0b0010,					MOVE,		Inst_move ),
+	MATCH_ENTRY2_IMPL(12,4,0b0010, 6,3,0b001,		CPU_MIN_68000, MOVEA,		Inst_movea ),
+	MATCH_ENTRY1_IMPL(12,4,0b0010,					CPU_MIN_68000, MOVE,		Inst_move ),
 	MATCH_END
 };
 
 const matcher_entry g_matcher_table_0011[] =
 {
-	MATCH_ENTRY2_IMPL(12,4,0b0011, 6,3,0b001,		MOVEA,		Inst_movea ),
-	MATCH_ENTRY1_IMPL(12,4,0b0011,					MOVE,		Inst_move ),
+	MATCH_ENTRY2_IMPL(12,4,0b0011, 6,3,0b001,		CPU_MIN_68000, MOVEA,		Inst_movea ),
+	MATCH_ENTRY1_IMPL(12,4,0b0011,					CPU_MIN_68000, MOVE,		Inst_move ),
 	MATCH_END
 };
 
 const matcher_entry g_matcher_table_0100[] =
 {
-	MATCH_ENTRY1_IMPL(0,16,0b0100101011111100,		ILLEGAL,	Inst_simple ),
-	MATCH_ENTRY1_IMPL(0,16,0b0100111001110000,		RESET,		Inst_simple ), // supervisor
-	MATCH_ENTRY1_IMPL(0,16,0b0100111001110001,		NOP,		Inst_simple ),
-	MATCH_ENTRY1_IMPL(0,16,0b0100111001110011,		RTE,		Inst_simple ), // supervisor
-	MATCH_ENTRY1_IMPL(0,16,0b0100111001110101,		RTS,		Inst_simple ),
-	MATCH_ENTRY1_IMPL(0,16,0b0100111001110110,		TRAPV,		Inst_simple ),
-	MATCH_ENTRY1_IMPL(0,16,0b0100111001110111,		RTR,		Inst_simple ),
-	MATCH_ENTRY1_IMPL(0,16,0b0100111001110010,		STOP,		Inst_stop ),
-
-	MATCH_ENTRY1_IMPL(3,13,0b0100100001000,			SWAP,		Inst_swap ),
-	MATCH_ENTRY1_IMPL(3,13,0b0100111001010,			LINK,		Inst_link_w ),
-	//([ ( 3,13, 0b0100100000001)			  ,		"LINK.L",	Inst_link_l ),  # not on 68000
-	MATCH_ENTRY1_IMPL(3,13,0b0100111001011,			UNLK,		Inst_unlk ),
-	MATCH_ENTRY1_IMPL(3,13,0b0100111001100,			MOVE,		Inst_move_to_usp ),
-	MATCH_ENTRY1_IMPL(3,13,0b0100111001101,			MOVE,		Inst_move_from_usp ),
-	MATCH_ENTRY1_IMPL(3,13,0b0100100010000,			EXT,		Inst_ext ),
-	MATCH_ENTRY1_IMPL(3,13,0b0100100011000,			EXT,		Inst_ext ),
-	//([ ( 3,13, 0b0100100011000)			  ,		"EXTB.L",	Inst_ext ),	 # not on 68000
-
-	MATCH_ENTRY1_IMPL(4,12,0b010011100100,			TRAP,		Inst_trap ),
-
-	MATCH_ENTRY1_IMPL(6,10,0b0100000011,			MOVE,		Inst_move_from_sr ),   // supervisor
-	MATCH_ENTRY1_IMPL(6,10,0b0100011011,			MOVE,		Inst_move_to_sr ),   // supervisor
-	//([ ( 6,10, 0b0100001011)				 ,		"MOVE FROM Ccr",	 Inst ),		  # not on 68000
-	MATCH_ENTRY1_IMPL(6,10,0b0100010011,			MOVE,		Inst_move_to_ccr ),
-	MATCH_ENTRY1_IMPL(6,10,0b0100100000,			NBCD,		Inst_nbcd ),
-	MATCH_ENTRY1_IMPL(6,10,0b0100100001,			PEA,		Inst_pea ),
-	MATCH_ENTRY1_IMPL(6,10,0b0100101011,			TAS,		Inst_tas ),
-	MATCH_ENTRY1_IMPL(6,10,0b0100111010,			JSR,		Inst_jump ),
-	MATCH_ENTRY1_IMPL(6,10,0b0100111011,			JMP,		Inst_jump ),
-
-	MATCH_ENTRY1_IMPL(7,9,0b010010001,				MOVEM,		Inst_movem_reg_mem ), // Register to memory.
-	MATCH_ENTRY1_IMPL(7,9,0b010011001,				MOVEM,		Inst_movem_mem_reg ), // Memory to register.
-
-	MATCH_ENTRY1_IMPL(8,8,0b01000000,				NEGX,		Inst_size_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b01000010,				CLR,		Inst_size_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b01000100,				NEG,		Inst_size_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b01000110,				NOT,		Inst_size_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b01001010,				TST,		Inst_size_ea ),
-
-	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b111,		LEA,		Inst_lea ),
-
-	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b110,		CHK,		Inst_chk ),
-	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b100,		CHK,		Inst_chk ),	// not 68000
-
+	MATCH_ENTRY1_IMPL(0,16,0b0100101011111100,		CPU_MIN_68000, ILLEGAL,		Inst_simple ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110000,		CPU_MIN_68000, RESET,		Inst_simple ), // supervisor
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110001,		CPU_MIN_68000, NOP,			Inst_simple ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110011,		CPU_MIN_68000, RTE,			Inst_simple ), // supervisor
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110101,		CPU_MIN_68000, RTS,			Inst_simple ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110110,		CPU_MIN_68000, TRAPV,		Inst_simple ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110111,		CPU_MIN_68000, RTR,			Inst_simple ),
+	MATCH_ENTRY1_IMPL(0,16,0b0100111001110010,		CPU_MIN_68000, STOP,		Inst_stop ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100100001001,			CPU_MIN_68010, BKPT,		Inst_bkpt ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100100001000,			CPU_MIN_68000, SWAP,		Inst_swap ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100111001010,			CPU_MIN_68000, LINK,		Inst_link_w ),
+	//([ ( 3,13, 0b0100100000001)			  ,		CPU_MIN_68000, "LINK.L",	Inst_link_l ),  # not on 68000
+	MATCH_ENTRY1_IMPL(3,13,0b0100111001011,			CPU_MIN_68000, UNLK,		Inst_unlk ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100111001100,			CPU_MIN_68000, MOVE,		Inst_move_to_usp ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100111001101,			CPU_MIN_68000, MOVE,		Inst_move_from_usp ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100100010000,			CPU_MIN_68000, EXT,			Inst_ext ),
+	MATCH_ENTRY1_IMPL(3,13,0b0100100011000,			CPU_MIN_68000, EXT,			Inst_ext ),
+	//([ ( 3,13, 0b0100100011000)			  ,		CPU_MIN_68000, "EXTB.L",	Inst_ext ),	 # not on 68000
+	MATCH_ENTRY1_IMPL(4,12,0b010011100100,			CPU_MIN_68000, TRAP,		Inst_trap ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100000011,			CPU_MIN_68000, MOVE,		Inst_move_from_sr ),   // supervisor
+	MATCH_ENTRY1_IMPL(6,10,0b0100011011,			CPU_MIN_68000, MOVE,		Inst_move_to_sr ),   // supervisor
+	//([ ( 6,10, 0b0100001011)				 ,		CPU_MIN_68000, "MOVE FROM Ccr",	 Inst ),		  # not on 68000
+	MATCH_ENTRY1_IMPL(6,10,0b0100010011,			CPU_MIN_68000, MOVE,		Inst_move_to_ccr ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100100000,			CPU_MIN_68000, NBCD,		Inst_nbcd ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100100001,			CPU_MIN_68000, PEA,			Inst_pea ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100101011,			CPU_MIN_68000, TAS,			Inst_tas ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100111010,			CPU_MIN_68000, JSR,			Inst_jump ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100111011,			CPU_MIN_68000, JMP,			Inst_jump ),
+	MATCH_ENTRY1_IMPL(7,9,0b010010001,				CPU_MIN_68000, MOVEM,		Inst_movem_reg_mem ), // Register to memory.
+	MATCH_ENTRY1_IMPL(7,9,0b010011001,				CPU_MIN_68000, MOVEM,		Inst_movem_mem_reg ), // Memory to register.
+	MATCH_ENTRY1_IMPL(8,8,0b01000000,				CPU_MIN_68000, NEGX,		Inst_size_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b01000010,				CPU_MIN_68000, CLR,			Inst_size_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b01000100,				CPU_MIN_68000, NEG,			Inst_size_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b01000110,				CPU_MIN_68000, NOT,			Inst_size_ea ),
+	MATCH_ENTRY1_IMPL(8,8,0b01001010,				CPU_MIN_68000, TST,			Inst_size_ea ),
+	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b111,		CPU_MIN_68000, LEA,			Inst_lea ),
+	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b110,		CPU_MIN_68000, CHK,			Inst_chk ),
+	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b100,		CPU_MIN_68000, CHK,			Inst_chk ),	// not 68000
 	MATCH_END
 };
 
 const matcher_entry g_matcher_table_0101[] =
 {
 	//Table 3-19. Conditional TESTS
-	// These sneakily take the "001" in the bottom 3 BITS TO OVErride the EA parts of Scc
-	MATCH_ENTRY1_IMPL(3,13,0b0101000111001,			DBF,		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101001011001,			DBHI,		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101001111001,			DBLS,		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101010011001,			DBCC,		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101010111001,			DBCS,		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101011011001,			DBNE,		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101011111001,			DBEQ,		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101100011001,			DBVC,		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101100111001,			DBVS,		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101101011001,			DBPL,		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101101111001,			DBMI,		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101110011001,			DBGE,		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101110111001,			DBLT,		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101111011001,			DBGT,		Inst_dbcc ),
-	MATCH_ENTRY1_IMPL(3,13,0b0101111111001,			DBLE,		Inst_dbcc ),
-
-	MATCH_ENTRY1_IMPL(6,10,0b0101000011,			ST,			Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101000111,			SF,			Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101001011,			SHI,		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101001111,			SLS,		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101010011,			SCC,		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101010111,			SCS,		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101011011,			SNE,		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101011111,			SEQ,		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101100011,			SVC,		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101100111,			SVS,		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101101011,			SPL,		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101101111,			SMI,		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101110011,			SGE,		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101110111,			SLT,		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101111011,			SGT,		Inst_scc ),
-	MATCH_ENTRY1_IMPL(6,10,0b0101111111,			SLE,		Inst_scc ),
-
-	MATCH_ENTRY2_IMPL(12,4,0b0101, 8,1,0b1,			SUBQ,		Inst_subq ),
-	MATCH_ENTRY2_IMPL(12,4,0b0101, 8,1,0b0,			ADDQ,		Inst_subq ),
+	// These sneakily take the "001" in the bottom 3 BITS TO override the EA parts of Scc
+	MATCH_ENTRY1_IMPL(3,13,0b0101000111001,			CPU_MIN_68000, DBF,			Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101001011001,			CPU_MIN_68000, DBHI,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101001111001,			CPU_MIN_68000, DBLS,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101010011001,			CPU_MIN_68000, DBCC,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101010111001,			CPU_MIN_68000, DBCS,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101011011001,			CPU_MIN_68000, DBNE,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101011111001,			CPU_MIN_68000, DBEQ,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101100011001,			CPU_MIN_68000, DBVC,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101100111001,			CPU_MIN_68000, DBVS,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101101011001,			CPU_MIN_68000, DBPL,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101101111001,			CPU_MIN_68000, DBMI,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101110011001,			CPU_MIN_68000, DBGE,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101110111001,			CPU_MIN_68000, DBLT,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101111011001,			CPU_MIN_68000, DBGT,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101111111001,			CPU_MIN_68000, DBLE,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101000011,			CPU_MIN_68000, ST,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101000111,			CPU_MIN_68000, SF,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101001011,			CPU_MIN_68000, SHI,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101001111,			CPU_MIN_68000, SLS,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101010011,			CPU_MIN_68000, SCC,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101010111,			CPU_MIN_68000, SCS,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101011011,			CPU_MIN_68000, SNE,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101011111,			CPU_MIN_68000, SEQ,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101100011,			CPU_MIN_68000, SVC,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101100111,			CPU_MIN_68000, SVS,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101101011,			CPU_MIN_68000, SPL,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101101111,			CPU_MIN_68000, SMI,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101110011,			CPU_MIN_68000, SGE,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101110111,			CPU_MIN_68000, SLT,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101111011,			CPU_MIN_68000, SGT,			Inst_scc ),
+	MATCH_ENTRY1_IMPL(6,10,0b0101111111,			CPU_MIN_68000, SLE,			Inst_scc ),
+	MATCH_ENTRY2_IMPL(12,4,0b0101, 8,1,0b1,			CPU_MIN_68000, SUBQ,		Inst_subq ),
+	MATCH_ENTRY2_IMPL(12,4,0b0101, 8,1,0b0,			CPU_MIN_68000, ADDQ,		Inst_subq ),
 	MATCH_END
 };
 
 const matcher_entry g_matcher_table_0110[] =
 {
-	MATCH_ENTRY1_IMPL(8,8,0b01100000,				BRA,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100001,				BSR,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100010,				BHI,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100011,				BLS,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100100,				BCC,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100101,				BCS,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100110,				BNE,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01100111,				BEQ,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101000,				BVC,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101001,				BVS,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101010,				BPL,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101011,				BMI,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101100,				BGE,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101101,				BLT,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101110,				BGT,		Inst_branch ),
-	MATCH_ENTRY1_IMPL(8,8,0b01101111,				BLE,		Inst_branch ),
-
+	MATCH_ENTRY1_IMPL(8,8,0b01100000,				CPU_MIN_68000, BRA,			Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100001,				CPU_MIN_68000, BSR,			Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100010,				CPU_MIN_68000, BHI,			Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100011,				CPU_MIN_68000, BLS,			Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100100,				CPU_MIN_68000, BCC,			Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100101,				CPU_MIN_68000, BCS,			Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100110,				CPU_MIN_68000, BNE,			Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01100111,				CPU_MIN_68000, BEQ,			Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101000,				CPU_MIN_68000, BVC,			Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101001,				CPU_MIN_68000, BVS,			Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101010,				CPU_MIN_68000, BPL,			Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101011,				CPU_MIN_68000, BMI,			Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101100,				CPU_MIN_68000, BGE,			Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101101,				CPU_MIN_68000, BLT,			Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101110,				CPU_MIN_68000, BGT,			Inst_branch ),
+	MATCH_ENTRY1_IMPL(8,8,0b01101111,				CPU_MIN_68000, BLE,			Inst_branch ),
 	MATCH_END
 };
 
 const matcher_entry g_matcher_table_0111[] =
 {
-	MATCH_ENTRY2_IMPL(12,4,0b0111, 8,1,0b0,			MOVEQ,		Inst_moveq ),
-
+	MATCH_ENTRY2_IMPL(12,4,0b0111, 8,1,0b0,			CPU_MIN_68000, MOVEQ,		Inst_moveq ),
 	MATCH_END
 };
 
 const matcher_entry g_matcher_table_1000[] =
 {
-	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b100000,	SBCD,		Inst_sbcd_reg ),
-	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b100001,	SBCD,		Inst_sbcd_predec ),
-	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b011,		DIVU,		Inst_muldiv ),
-	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b111,		DIVS,		Inst_muldiv ),
-	MATCH_ENTRY1_IMPL(12,4,0b1000,					OR,			Inst_alu_dreg ),
+	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b100000,	CPU_MIN_68000, SBCD,		Inst_sbcd_reg ),
+	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b100001,	CPU_MIN_68000, SBCD,		Inst_sbcd_predec ),
+	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b011,		CPU_MIN_68000, DIVU,		Inst_muldiv ),
+	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b111,		CPU_MIN_68000, DIVS,		Inst_muldiv ),
+	MATCH_ENTRY1_IMPL(12,4,0b1000,					CPU_MIN_68000, OR,			Inst_alu_dreg ),
 	MATCH_END
 };
 
 const matcher_entry g_matcher_table_1001[] =
 {
-	MATCH_ENTRY2_IMPL(12,4,0b1001, 6,2,0b11,		SUBA,		Inst_addsuba ),
-	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,0,	SUBX,		Inst_subx_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,1,	SUBX,		Inst_subx_predec ),
-	MATCH_ENTRY1_IMPL(12,4,0b1001,					SUB,		Inst_alu_dreg ),
+	MATCH_ENTRY2_IMPL(12,4,0b1001, 6,2,0b11,		CPU_MIN_68000, SUBA,		Inst_addsuba ),
+	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,0,	CPU_MIN_68000, SUBX,		Inst_subx_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,1,	CPU_MIN_68000, SUBX,		Inst_subx_predec ),
+	MATCH_ENTRY1_IMPL(12,4,0b1001,					CPU_MIN_68000, SUB,			Inst_alu_dreg ),
 	MATCH_END
 };
 
@@ -1347,62 +1500,59 @@ const matcher_entry g_matcher_table_1010[] =
 
 const matcher_entry g_matcher_table_1011[] =
 {
-	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,2,3,			CMPA,		Inst_cmpa ),
-	MATCH_ENTRY3_IMPL(12,4,0b1011, 8,1,1, 3,3,1,	CMPM,		Inst_cmpm ),
+	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,2,3,			CPU_MIN_68000, CMPA,		Inst_cmpa ),
+	MATCH_ENTRY3_IMPL(12,4,0b1011, 8,1,1, 3,3,1,	CPU_MIN_68000, CMPM,		Inst_cmpm ),
 	// Nasty case where eor and cmp mirror one another
-	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b100,		EOR,		Inst_eor ),
-	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b101,		EOR,		Inst_eor ),
-	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b110,		EOR,		Inst_eor ),
+	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b100,		CPU_MIN_68000, EOR,			Inst_eor ),
+	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b101,		CPU_MIN_68000, EOR,			Inst_eor ),
+	MATCH_ENTRY2_IMPL(12,4,0b1011, 6,3,0b110,		CPU_MIN_68000, EOR,			Inst_eor ),
 	// Fallback GENERICS
-	MATCH_ENTRY1_IMPL(12,4,0b1011,					CMP,		Inst_cmp ),
+	MATCH_ENTRY1_IMPL(12,4,0b1011,					CPU_MIN_68000, CMP,			Inst_cmp ),
 	MATCH_END
 };
 
 const matcher_entry g_matcher_table_1100[] =
 {
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b100000,	ABCD,		Inst_sbcd_reg ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b100001,	ABCD,		Inst_sbcd_predec ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100,    6,3,0b011,	MULU,		Inst_muldiv ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100,    6,3,0b111,	MULS,		Inst_muldiv ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101000,	EXG,		Inst_exg_dd ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101001,	EXG,		Inst_exg_aa ),
-	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b110001,	EXG,		Inst_exg_da ),
-	MATCH_ENTRY1_IMPL(12,4,0b1100,					AND,		Inst_alu_dreg ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b100000,	CPU_MIN_68000, ABCD,		Inst_sbcd_reg ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b100001,	CPU_MIN_68000, ABCD,		Inst_sbcd_predec ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 6,3,0b011,		CPU_MIN_68000, MULU,		Inst_muldiv ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 6,3,0b111,		CPU_MIN_68000, MULS,		Inst_muldiv ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101000,	CPU_MIN_68000, EXG,			Inst_exg_dd ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101001,	CPU_MIN_68000, EXG,			Inst_exg_aa ),
+	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b110001,	CPU_MIN_68000, EXG,			Inst_exg_da ),
+	MATCH_ENTRY1_IMPL(12,4,0b1100,					CPU_MIN_68000, AND,			Inst_alu_dreg ),
 	MATCH_END
 };
 
 const matcher_entry g_matcher_table_1101[] =
 {
-	MATCH_ENTRY2_IMPL(12,4,0b1101, 6,2,0b11,		ADDA,		Inst_addsuba ),	// more specific than ADDX
-	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,0,	ADDX,		Inst_subx_reg ),
-	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,1,	ADDX,		Inst_subx_predec ),
-	MATCH_ENTRY1_IMPL(12,4,0b1101,					ADD,		Inst_alu_dreg ),
+	MATCH_ENTRY2_IMPL(12,4,0b1101, 6,2,0b11,		CPU_MIN_68000, ADDA,		Inst_addsuba ),	// more specific than ADDX
+	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,0,	CPU_MIN_68000, ADDX,		Inst_subx_reg ),
+	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,1,	CPU_MIN_68000, ADDX,		Inst_subx_predec ),
+	MATCH_ENTRY1_IMPL(12,4,0b1101,					CPU_MIN_68000, ADD,			Inst_alu_dreg ),
 	MATCH_END
 };
 
 const matcher_entry g_matcher_table_1110[] =
 {
-	MATCH_ENTRY1_IMPL(6,10,0b1110000011,			ASR,		Inst_asl_asr_mem ),
-	MATCH_ENTRY1_IMPL(6,10,0b1110000111,			ASL,		Inst_asl_asr_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110000011,			CPU_MIN_68000, ASR,			Inst_asl_asr_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110000111,			CPU_MIN_68000, ASL,			Inst_asl_asr_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110011011,			CPU_MIN_68000, ROR,			Inst_asl_asr_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110011111,			CPU_MIN_68000, ROL,			Inst_asl_asr_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110001011,			CPU_MIN_68000, LSR,			Inst_asl_asr_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110001111,			CPU_MIN_68000, LSL,			Inst_asl_asr_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110010011,			CPU_MIN_68000, ROXR,		Inst_asl_asr_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110010111,			CPU_MIN_68000, ROXL,		Inst_asl_asr_mem ),
 
-	MATCH_ENTRY1_IMPL(6,10,0b1110011011,			ROR,		Inst_asl_asr_mem ),
-	MATCH_ENTRY1_IMPL(6,10,0b1110011111,			ROL,		Inst_asl_asr_mem ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,1,	CPU_MIN_68000, ASL,			Inst_shift_mem ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,0,	CPU_MIN_68000, ASR,			Inst_shift_mem ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,1, 8,1,1,	CPU_MIN_68000, LSL,			Inst_shift_mem ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,1, 8,1,0,	CPU_MIN_68000, LSR,			Inst_shift_mem ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,1,	CPU_MIN_68000, ROL,			Inst_shift_mem ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,0,	CPU_MIN_68000, ROR,			Inst_shift_mem ),
 
-	MATCH_ENTRY1_IMPL(6,10,0b1110001011,			LSR,		Inst_asl_asr_mem ),
-	MATCH_ENTRY1_IMPL(6,10,0b1110001111,			LSL,		Inst_asl_asr_mem ),
-
-	MATCH_ENTRY1_IMPL(6,10,0b1110010011,			ROXR,		Inst_asl_asr_mem ),
-	MATCH_ENTRY1_IMPL(6,10,0b1110010111,			ROXL,		Inst_asl_asr_mem ),
-
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,1,	ASL,		Inst_shift_mem ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,0,	ASR,		Inst_shift_mem ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,1, 8,1,1,	LSL,		Inst_shift_mem ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,1, 8,1,0,	LSR,		Inst_shift_mem ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,1,	ROL,		Inst_shift_mem ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,3, 8,1,0,	ROR,		Inst_shift_mem ),
-
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,2, 8,1,1,	ROXL,		Inst_shift_mem ),
-	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,2, 8,1,0,	ROXR,		Inst_shift_mem ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,2, 8,1,1,	CPU_MIN_68000, ROXL,		Inst_shift_mem ),
+	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,2, 8,1,0,	CPU_MIN_68000, ROXR,		Inst_shift_mem ),
 	MATCH_END
 };
 
@@ -1442,6 +1592,7 @@ int decode(buffer_reader& buffer, const decode_settings& dsettings, instruction&
 	// Check remaining size
 	uint16_t header0 = 0;
 	uint32_t start_pos = buffer.get_pos();
+	uint16_t cpu_mask = (1 << dsettings.cpu_type);
 
 	if (buffer.get_remain() < 2)
 		return 1;
@@ -1454,13 +1605,17 @@ int decode(buffer_reader& buffer, const decode_settings& dsettings, instruction&
 	buffer_reader reader_tmp = buffer;
 	uint16_t table = (header0 >> 12) & 0xf;
 	for (const matcher_entry* pEntry = g_matcher_tables[table];
-		pEntry->mask0 != 0;
+		pEntry->mask!= 0;
 		++pEntry)
 	{
-		assert(((pEntry->val0 >> 12) & 0xf) == table);
+		assert(((pEntry->val >> 12) & 0xf) == table);
+		assert((pEntry->mask & pEntry->val) == pEntry->val);
+		if ((cpu_mask & pEntry->cpu_mask) == 0)
+			continue;
+
 		// Choose 16 or 32 bits for the check
 		uint32_t header = header0;
-		if ((header & pEntry->mask0) != pEntry->val0)
+		if ((header & pEntry->mask) != pEntry->val)
 			continue;
 
 		// Do specialised decoding

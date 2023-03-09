@@ -32,6 +32,7 @@ const char* instruction_names[Opcode::COUNT] =
 	"bge",
 	"bgt",
 	"bhi",
+	"bkpt",
 	"ble",
 	"bls",
 	"blt",
@@ -133,6 +134,29 @@ const char* instruction_names[Opcode::COUNT] =
 };
 
 // ----------------------------------------------------------------------------
+const char* g_index_register_names[] =
+{
+	"d0",
+	"d1",
+	"d2",
+	"d3",
+	"d4",
+	"d5",
+	"d6",
+	"d7",
+	"a0",
+	"a1",
+	"a2",
+	"a3",
+	"a4",
+	"a5",
+	"a6",
+	"a7",
+	"pc",
+	""
+};
+
+// ----------------------------------------------------------------------------
 //	INSTRUCTION ANALYSIS
 // ----------------------------------------------------------------------------
 // Check if an instruction jumps to another known address, and return that address
@@ -216,6 +240,113 @@ static const char* g_scale_names[] =
 };
 
 // ----------------------------------------------------------------------------
+static void print_index_indirect(const index_indirect& ind, FILE* pFile)
+{
+	if (ind.index_reg == INDEX_REG_NONE)
+		return;
+	fprintf(pFile, "%s.%s%s",
+		g_index_register_names[ind.index_reg],
+		ind.is_long ? "l" : "w",
+		g_scale_names[ind.scale_shift]);
+}
+
+// ----------------------------------------------------------------------------
+enum LastOutput
+{
+	kNone,			// start token
+	kValue,			// number or similar
+	kComma,			// ','
+	kOpenBrace,		// '['
+	kCloseBrace		// ']'
+};
+
+// ----------------------------------------------------------------------------
+static void open_brace(LastOutput& last, bool& is_brace_open, FILE* pFile)
+{
+	if (!is_brace_open)
+	{
+		fprintf(pFile, "[");
+		is_brace_open = true;
+		last = kOpenBrace;
+	}
+}
+
+// ----------------------------------------------------------------------------
+static void close_brace(LastOutput& last, bool& is_brace_open, FILE* pFile)
+{
+	if (is_brace_open)
+	{
+		fprintf(pFile, "]");
+		last = kCloseBrace;
+	}
+	//else
+	//{
+	//	// Insert an empty region
+	//	fprintf(pFile, "[0]");
+	//	last = kCloseBrace;
+	//}
+	is_brace_open = false;
+}
+
+// ----------------------------------------------------------------------------
+static void insert_comma(LastOutput& last, FILE* pFile)
+{
+	if (last == kValue || last == kCloseBrace)
+	{
+		fprintf(pFile, ",");
+		last = kComma;
+	}
+}
+
+// ----------------------------------------------------------------------------
+static void print_indexed_68020(const indirect_index_full& ref, const symbols& symbols, 
+	int brace_open, int brace_close, uint32_t inst_address, FILE* pFile)
+{
+	fprintf(pFile, "(");
+	LastOutput last = kNone;
+	bool is_brace_open = false;
+	symbol sym;
+	for (int index = 0; index < 4; ++index)
+	{
+		if (ref.used[index])
+		{
+			// if an item is printed, we might need to open a brace or
+			// insert a separating comma
+			if (index >= brace_open && index <= brace_close)
+				open_brace(last, is_brace_open, pFile);
+			insert_comma(last, pFile);
+			switch (index)
+			{
+				case 0:
+					if (ref.base_register == IndexRegister::INDEX_REG_PC)
+					{
+						// Decode PC-relative addresses
+						uint32_t address = ref.base_displacement + inst_address;
+						if (find_symbol(symbols, address, sym))
+							fprintf(pFile, "%s", sym.label.c_str());
+						else
+							fprintf(pFile, "$%x", address);
+					}
+					else
+						fprintf(pFile, "$%x", ref.base_displacement);
+					break;
+				case 1:
+					fprintf(pFile, "%s", g_index_register_names[ref.base_register]); break;
+				case 2:
+					print_index_indirect(ref.index, pFile); break;
+				case 3:
+					fprintf(pFile, "$%x", ref.outer_displacement); break;
+			}
+			last = kValue;
+		}
+		// Brace might need to be closed whether even if a new value wasn't printed
+		if (index == brace_close)
+			close_brace(last, is_brace_open, pFile);
+	}
+	fprintf(pFile, ")");
+}
+
+// ----------------------------------------------------------------------------
 void print(const operand& operand, const symbols& symbols, uint32_t inst_address, FILE* pFile)
 {
 	switch (operand.type)
@@ -239,13 +370,11 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 			fprintf(pFile, "%d(a%d)", operand.indirect_disp.disp, operand.indirect_disp.reg);
 			return;
 		case OpType::INDIRECT_INDEX:
-			fprintf(pFile, "%d(a%d,%s%d.%s%s)",
+			fprintf(pFile, "%d(a%d,",
 					operand.indirect_index.disp,
-					operand.indirect_index.a_reg,
-					operand.indirect_index.indirect_info.index_reg.register_type ? "a" : "d",
-					operand.indirect_index.indirect_info.index_reg.reg_number,
-					operand.indirect_index.indirect_info.is_long ? "l" : "w",
-					g_scale_names[operand.indirect_index.indirect_info.scale_shift]);
+					operand.indirect_index.a_reg);
+			print_index_indirect(operand.indirect_index.indirect_info, pFile);
+			fprintf(pFile, ")");
 			return;
 		case OpType::ABSOLUTE_WORD:
 			if (operand.absolute_word.wordaddr & 0x8000)
@@ -282,20 +411,19 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 
 			if (find_symbol(symbols, target_address, sym))
 			{
-				fprintf(pFile, "%s(pc,%s%d.%s%s)",
+				fprintf(pFile, "%s(pc,%s.%s%s)",
 						sym.label.c_str(),
-						operand.pc_disp_index.indirect_info.index_reg.register_type ? "a" : "d",
-						operand.pc_disp_index.indirect_info.index_reg.reg_number,
+						g_index_register_names[operand.pc_disp_index.indirect_info.index_reg],
 						operand.pc_disp_index.indirect_info.is_long ? "l" : "w",
 						g_scale_names[operand.pc_disp_index.indirect_info.scale_shift]);
 			}
 			else
 			{
-				fprintf(pFile, "$%x(pc,%s%d.%s)",
+				fprintf(pFile, "$%x(pc,%s.%s%s)",
 					target_address,
-					operand.pc_disp_index.indirect_info.index_reg.register_type ? "a" : "d",
-					operand.pc_disp_index.indirect_info.index_reg.reg_number,
-					operand.pc_disp_index.indirect_info.is_long ? "l" : "w");
+					g_index_register_names[operand.pc_disp_index.indirect_info.index_reg],
+					operand.pc_disp_index.indirect_info.is_long ? "l" : "w",
+					g_scale_names[operand.pc_disp_index.indirect_info.scale_shift]);
 			}
 			return;
 		}
@@ -323,7 +451,19 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 				fprintf(pFile, "$%x", target_address);
 			return;
 		}
-
+		case OpType::INDIRECT_POSTINDEXED:
+			print_indexed_68020(operand.indirect_index_68020, symbols, 0, 1, inst_address, pFile);
+			return;
+		case OpType::INDIRECT_PREINDEXED:
+			print_indexed_68020(operand.indirect_index_68020, symbols, 0, 2, inst_address, pFile);
+			return;
+		case OpType::MEMORY_INDIRECT:
+			// This is the same as postindexed, except IS is suppressed!
+			print_indexed_68020(operand.indirect_index_68020, symbols, 0, 1, inst_address, pFile);
+			return;
+		case OpType::NO_MEMORY_INDIRECT:
+			print_indexed_68020(operand.indirect_index_68020, symbols, -1, -1, inst_address, pFile);
+			return;
 		case OpType::IMMEDIATE:
 			fprintf(pFile, "#$%x", operand.imm.val0);
 			return;

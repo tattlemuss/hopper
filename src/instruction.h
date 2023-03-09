@@ -27,6 +27,7 @@ enum Opcode
 	BGE,
 	BGT,
 	BHI,
+	BKPT,
 	BLE,
 	BLS,
 	BLT,
@@ -141,20 +142,25 @@ enum class Size
 enum OpType
 {
 	INVALID = 0,
-	D_DIRECT,			// Dn		 000 reg. number:Dn
-	A_DIRECT,			// An		 001 reg. number:An
-	INDIRECT,			// (An)	   010 reg. number:An
-	INDIRECT_POSTINC,	// (An) +	 011 reg. number:An
-	INDIRECT_PREDEC,	// – (An)	 100 reg. number:An
-	INDIRECT_DISP,		// (d16,An)   101 reg. number:An
-	INDIRECT_INDEX,		// (d8,An,Xn) 110 reg. number:An
-	ABSOLUTE_WORD,		// (xxx).W	111 000
-	ABSOLUTE_LONG,		// (xxx).L	111 001
-	PC_DISP,			// (d16,PC)   111 010
-	PC_DISP_INDEX,		// (d8,PC,Xn) 111 011
-	IMMEDIATE,			// <data>	 111 100
-	MOVEM_REG,			// mask of registers
-	RELATIVE_BRANCH,	// +/- 32K branch, doesn't display (pc)
+	D_DIRECT,				// Dn		 000 reg. number:Dn
+	A_DIRECT,				// An		 001 reg. number:An
+	INDIRECT,				// (An)	   010 reg. number:An
+	INDIRECT_POSTINC,		// (An) +	 011 reg. number:An
+	INDIRECT_PREDEC,		// – (An)	 100 reg. number:An
+	INDIRECT_DISP,			// (d16,An)   101 reg. number:An
+	INDIRECT_INDEX,			// (d8,An,Xn) 110 reg. number:An
+	ABSOLUTE_WORD,			// (xxx).W	111 000
+	ABSOLUTE_LONG,			// (xxx).L	111 001
+	PC_DISP,				// (d16,PC)   111 010
+	PC_DISP_INDEX,			// (d8,PC,Xn) 111 011
+	IMMEDIATE,				// <data>	 111 100
+	MOVEM_REG,				// mask of registers
+	RELATIVE_BRANCH,		// +/- 32K branch, doesn't display (pc)
+	INDIRECT_PREINDEXED,	// (68020+)
+	INDIRECT_POSTINDEXED,	// (68020+)
+	MEMORY_INDIRECT,		// (68020+)
+	NO_MEMORY_INDIRECT,		// (68020+)
+
 	// Specific registers
 	SR,
 	USP,
@@ -162,19 +168,46 @@ enum OpType
 };
 
 // ----------------------------------------------------------------------------
-struct index_register
+enum IndexRegister
 {
-	uint8_t	register_type : 1;		// 0 == D-reg, 1 == A reg
-	uint8_t	reg_number;					// 0-7
+	INDEX_REG_D0,
+	INDEX_REG_D1,
+	INDEX_REG_D2,
+	INDEX_REG_D3,
+	INDEX_REG_D4,
+	INDEX_REG_D5,
+	INDEX_REG_D6,
+	INDEX_REG_D7,
+	INDEX_REG_A0,
+	INDEX_REG_A1,
+	INDEX_REG_A2,
+	INDEX_REG_A3,
+	INDEX_REG_A4,
+	INDEX_REG_A5,
+	INDEX_REG_A6,
+	INDEX_REG_A7,
+	INDEX_REG_PC,
+	INDEX_REG_NONE
 };
 
 // ----------------------------------------------------------------------------
-// Fields relating to address- or PC-index indirect
+// Fields relating to address- or PC-index indirect (simple indexing)
+// e.g. the "d2.w*4" in an opcode
 struct index_indirect
 {
 	bool is_long;
 	uint8_t scale_shift;		// 0 - scale 1, 1 = scale*2, 2 = scale*4, 3=scale*8
-	index_register index_reg;
+	IndexRegister index_reg;	// e.g. a0, d0, pc, none
+};
+
+// ----------------------------------------------------------------------------
+struct indirect_index_full
+{
+	uint8_t					used[4];			// Denotes whether the below items are to be displayed
+	int32_t					base_displacement;	// 0
+	IndexRegister			base_register;		// 1
+	index_indirect			index;				// 2
+	int32_t					outer_displacement;	// 3
 };
 
 // ----------------------------------------------------------------------------
@@ -269,6 +302,7 @@ struct operand
 			int32_t inst_disp;		// offset from the base instruction address. Can be $7ffe+2 bytes max.
 		} relative_branch;
 
+		indirect_index_full		indirect_index_68020;
 	};
 };
 

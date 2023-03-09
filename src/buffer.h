@@ -15,6 +15,7 @@ public:
 		m_pos(0)
 	{}
 
+	// Returns 0 for success, 1 for failure
 	int read_byte(uint8_t& data)
 	{
 		if (m_pos + 1 > m_length)
@@ -23,6 +24,7 @@ public:
 		return 0;
 	}
 
+	// Returns 0 for success, 1 for failure
 	int read_word(uint16_t& data)
 	{
 		if (m_pos + 2 > m_length)
@@ -33,6 +35,7 @@ public:
 		return 0;
 	}
 
+	// Returns 0 for success, 1 for failure
 	int read_long(uint32_t& data)
 	{
 		if (m_pos + 4 > m_length)
@@ -48,6 +51,7 @@ public:
 	}
 
 	// Copy bytes into the buffer
+	// Returns 0 for success, 1 for failure
 	int read(uint8_t* data, int count)
 	{
 		if (m_pos + count > m_length)
