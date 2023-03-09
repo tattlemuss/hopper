@@ -63,4 +63,9 @@ L1:
 	bfclr	L2{d0:d7}
 	bfclr	(a0){d0:32}
 	bfexts	L2(pc){d0:32},d1
+	bfextu	L2(pc){d1:32},d6
+	bfffo	L2(pc){1:10},d7
+	bfins	d7,2(a0){1:10}
+	bfset	2(a0){1:10}
+	bftst	L2(pc){1:10}
 L2:

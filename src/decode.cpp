@@ -127,27 +127,28 @@ enum class ea_group
 	CONTROL_MOVEM2	= 6,	// Movem to reg
 	ALT				= 7,	// Alterable including A-reg
 	ALL				= 8,	// e.g. cmp
-	D_CONTROL		= 9,	// Data-reg direct or Control (68020 bitfields)
+	BF_READ			= 9,	// 68020 bitfields, readable
+	BF_WRITE		= 10,	// 68020 bitfields, writeable
 	COUNT
 };
 
 // Defines which instruction modes are allowed to have which EA modes
 static bool mode_availability[][static_cast<int>(ea_group::COUNT)] =
 {
-	// DataAlt	Data	MemAlt	Mem		Ctrl	CMovem	CMovem2	Alt		All		D_Ctrl
-	{	true,	true,	false,	false,	false,	false,	false,	true,	true,	true,	}, // D_DIRECT			000 regno
-	{	false,	false,	false,	false,	false,	false,	false,	true,	true,	false,	}, // A_DIRECT			001 regno
-	{	true,	true,	true,	true,	true,	true,	true,	true,	true,	true,	}, // INDIRECT			010 regno
-	{	true,	true,	true,	true,	false,	false,	true,	true,	true,	false	}	, // INDIRECT_POSTINC	011 regno
-	{	true,	true,	true,	true,	false,	true,	true,	true,	true,	false	}, // INDIRECT_PREDEC	 100 regno
-	{	true,	true,	true,	true,	true,	true,	true,	true,	true,	true	}, // INDIRECT_DISP	   101 regno
-	{	true,	true,	true,	true,	true,	true,	true,	true,	true,	true	}, // INDIRECT_INDEX,	 110 regno
-	{	true,	true,	true,	true,	true,	true,	true,	true,	true,	true	}, // ABSOLUTE_WORD	   111 000
-	{	true,	true,	true,	true,	true,	true,	true,	true,	true,	true	}, // ABSOLUTE_LONG	   111 001  // There is a typo in the doc here
-	{	false,  true,	false,	true,	true,	true,	true,	false,	true,	false	}, // PC_DISP			 111 010
-	{	false,  true,	false,	true,	true,	true,	true,	false,	true,	false	}, // PC_DISP_INDEX	   111 011
-	{	false,  true,	false,	true,	false,	false,	false,	false,	true,	false	}, // IMMEDIATE		   111 100
-	{	false,  false,	false,	false,	false,	false,	false,	false,	false,	false	}, // INVALID		   111 100
+	// DataAlt	Data	MemAlt	Mem		Ctrl	CMovem	CMovem2	Alt		All		BFRead	BFWrite
+	{	true,	true,	false,	false,	false,	false,	false,	true,	true,	true,	true	}, // D_DIRECT			000 regno
+	{	false,	false,	false,	false,	false,	false,	false,	true,	true,	false,	false	}, // A_DIRECT			001 regno
+	{	true,	true,	true,	true,	true,	true,	true,	true,	true,	true,	true	}, // INDIRECT			010 regno
+	{	true,	true,	true,	true,	false,	false,	true,	true,	true,	false,	false	}, // INDIRECT_POSTINC	011 regno
+	{	true,	true,	true,	true,	false,	true,	true,	true,	true,	false,	false	}, // INDIRECT_PREDEC	 100 regno
+	{	true,	true,	true,	true,	true,	true,	true,	true,	true,	true,	true	}, // INDIRECT_DISP	   101 regno
+	{	true,	true,	true,	true,	true,	true,	true,	true,	true,	true,	true	}, // INDIRECT_INDEX,	 110 regno
+	{	true,	true,	true,	true,	true,	true,	true,	true,	true,	true,	true	}, // ABSOLUTE_WORD	   111 000
+	{	true,	true,	true,	true,	true,	true,	true,	true,	true,	true,	true	}, // ABSOLUTE_LONG	   111 001  // There is a typo in the doc here
+	{	false,  true,	false,	true,	true,	true,	true,	false,	true,	true,	false	}, // PC_DISP			 111 010
+	{	false,  true,	false,	true,	true,	true,	true,	false,	true,	true,	false	}, // PC_DISP_INDEX	   111 011
+	{	false,  true,	false,	true,	false,	false,	false,	false,	true,	false,	false	}, // IMMEDIATE		   111 100
+	{	false,  false,	false,	false,	false,	false,	false,	false,	false,	false,	false	}, // INVALID		   111 100
 };
 
 // ----------------------------------------------------------------------------
@@ -1107,7 +1108,7 @@ int Inst_asl_asr_mem(buffer_reader& buffer, const decode_settings& dsettings, in
 }
 
 // ----------------------------------------------------------------------------
-int Inst_bf1(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+int Inst_bf_ea_write(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
@@ -1117,11 +1118,25 @@ int Inst_bf1(buffer_reader& buffer, const decode_settings& dsettings, instructio
 		return 1;
 
 	decode_bitfield_word(inst.bf0, ext);
-	return decode_ea(buffer, dsettings, inst.op0, ea_group::D_CONTROL, mode, reg, Size::NONE, inst.address);
+	return decode_ea(buffer, dsettings, inst.op0, ea_group::BF_WRITE, mode, reg, Size::NONE, inst.address);
 }
 
 // ----------------------------------------------------------------------------
-int Inst_bfexts(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+int Inst_bf_ea_read(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+{
+	uint8_t mode = (header >> 3) & 7;
+	uint8_t reg  = (header >> 0) & 7;
+	inst.suffix = Suffix::NONE;
+	uint16_t ext;
+	if (buffer.read_word(ext))
+		return 1;
+
+	decode_bitfield_word(inst.bf0, ext);
+	return decode_ea(buffer, dsettings, inst.op0, ea_group::BF_READ, mode, reg, Size::NONE, inst.address);
+}
+
+// ----------------------------------------------------------------------------
+int Inst_bf_ea_dreg(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
@@ -1133,7 +1148,23 @@ int Inst_bfexts(buffer_reader& buffer, const decode_settings& dsettings, instruc
 	decode_bitfield_word(inst.bf0, ext);
 	uint8_t reg_number = (ext >> 12) & 7;
 	set_dreg(inst.op1, reg_number);
-	return decode_ea(buffer, dsettings, inst.op0, ea_group::CONTROL, mode, reg, Size::NONE, inst.address);
+	return decode_ea(buffer, dsettings, inst.op0, ea_group::BF_READ, mode, reg, Size::NONE, inst.address);
+}
+
+// ----------------------------------------------------------------------------
+int Inst_bf_dreg_ea(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+{
+	uint8_t mode = (header >> 3) & 7;
+	uint8_t reg  = (header >> 0) & 7;
+	inst.suffix = Suffix::NONE;
+	uint16_t ext;
+	if (buffer.read_word(ext))
+		return 1;
+
+	decode_bitfield_word(inst.bf1, ext);
+	uint8_t reg_number = (ext >> 12) & 7;
+	set_dreg(inst.op0, reg_number);
+	return decode_ea(buffer, dsettings, inst.op1, ea_group::BF_WRITE, mode, reg, Size::NONE, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -1726,9 +1757,14 @@ const matcher_entry g_matcher_table_1110[] =
 	MATCH_ENTRY1_IMPL(6,10,0b1110010111,			CPU_MIN_68000, ROXL,		Inst_asl_asr_mem ),
 	MATCH_ENTRY1_IMPL(6,10,0b1110011011,			CPU_MIN_68000, ROR,			Inst_asl_asr_mem ),
 	MATCH_ENTRY1_IMPL(6,10,0b1110011111,			CPU_MIN_68000, ROL,			Inst_asl_asr_mem ),
-	MATCH_ENTRY1_IMPL(6,10,0b1110101011,			CPU_MIN_68020, BFCHG,		Inst_bf1 ),
-	MATCH_ENTRY1_IMPL(6,10,0b1110101111,			CPU_MIN_68020, BFEXTS,		Inst_bfexts ),
-	MATCH_ENTRY1_IMPL(6,10,0b1110110011,			CPU_MIN_68020, BFCLR,		Inst_bf1 ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110101011,			CPU_MIN_68020, BFCHG,		Inst_bf_ea_write ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110100111,			CPU_MIN_68020, BFEXTU,		Inst_bf_ea_dreg ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110101111,			CPU_MIN_68020, BFEXTS,		Inst_bf_ea_dreg ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110110011,			CPU_MIN_68020, BFCLR,		Inst_bf_ea_write ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110110111,			CPU_MIN_68020, BFFFO,		Inst_bf_ea_dreg ),	// bit pattern error in PRM
+	MATCH_ENTRY1_IMPL(6,10,0b1110111011,			CPU_MIN_68020, BFSET,		Inst_bf_ea_write ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110111111,			CPU_MIN_68020, BFINS,		Inst_bf_dreg_ea ),
+	MATCH_ENTRY1_IMPL(6,10,0b1110100011,			CPU_MIN_68020, BFTST,		Inst_bf_ea_read ),
 
 	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,1,	CPU_MIN_68000, ASL,			Inst_shift_mem ),
 	MATCH_ENTRY3_IMPL(12,4,0b1110, 3,2,0, 8,1,0,	CPU_MIN_68000, ASR,			Inst_shift_mem ),
