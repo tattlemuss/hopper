@@ -663,7 +663,18 @@ int Inst_move_from_sr(buffer_reader& buffer, const decode_settings& dsettings, i
 
 	uint8_t mode = (header >> 3) & 7;
 	uint8_t reg  = (header >> 0) & 7;
-	return decode_ea(buffer, dsettings, inst.op1, ea_group::DATA, mode, reg, Size::WORD, inst.address);
+	return decode_ea(buffer, dsettings, inst.op1, ea_group::DATA_ALT, mode, reg, Size::WORD, inst.address);
+}
+
+// ----------------------------------------------------------------------------
+int Inst_move_from_ccr(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+{
+	inst.suffix = Suffix::WORD;
+	inst.op0.type = OpType::CCR;
+
+	uint8_t mode = (header >> 3) & 7;
+	uint8_t reg  = (header >> 0) & 7;
+	return decode_ea(buffer, dsettings, inst.op1, ea_group::DATA_ALT, mode, reg, Size::WORD, inst.address);
 }
 
 // ----------------------------------------------------------------------------
@@ -1389,6 +1400,7 @@ const matcher_entry g_matcher_table_0100[] =
 	MATCH_ENTRY1_IMPL(6,10,0b0100011011,			CPU_MIN_68000, MOVE,		Inst_move_to_sr ),   // supervisor
 	//([ ( 6,10, 0b0100001011)				 ,		CPU_MIN_68000, "MOVE FROM Ccr",	 Inst ),		  # not on 68000
 	MATCH_ENTRY1_IMPL(6,10,0b0100010011,			CPU_MIN_68000, MOVE,		Inst_move_to_ccr ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100001011,			CPU_MIN_68010, MOVE,		Inst_move_from_ccr ),   // supervisor
 	MATCH_ENTRY1_IMPL(6,10,0b0100100000,			CPU_MIN_68000, NBCD,		Inst_nbcd ),
 	MATCH_ENTRY1_IMPL(6,10,0b0100100001,			CPU_MIN_68000, PEA,			Inst_pea ),
 	MATCH_ENTRY1_IMPL(6,10,0b0100101011,			CPU_MIN_68000, TAS,			Inst_tas ),

@@ -36,3 +36,5 @@ L1:
 	jmp ([d7.l])
 
 	bkpt #$4
+	move.w ccr,(a0)
+	movem a0,-(a0)
