@@ -29,6 +29,9 @@ const char* instruction_names[Opcode::COUNT] =
 	"bclr",
 	"bcs",
 	"beq",
+	"bfchg",
+	"bfclr",
+	"bfexts",
 	"bge",
 	"bgt",
 	"bhi",
@@ -264,6 +267,25 @@ static void print_index_indirect(const index_indirect& ind, FILE* pFile)
 		g_index_register_names[ind.index_reg],
 		ind.is_long ? "l" : "w",
 		g_scale_names[ind.scale_shift]);
+}
+
+// ----------------------------------------------------------------------------
+static void print_bitfield_number(uint8_t is_reg, uint8_t offset, FILE* pFile)
+{
+	if (is_reg)
+		fprintf(pFile, "d%u", offset & 7);
+	else
+		fprintf(pFile, "%u", offset);
+}
+
+// ----------------------------------------------------------------------------
+static void print_bitfield(const bitfield& bf, FILE* pFile)
+{
+	fprintf(pFile, "{");
+	print_bitfield_number(bf.offset_is_dreg, bf.offset, pFile);
+	fprintf(pFile, ":");
+	print_bitfield_number(bf.width_is_dreg, bf.width, pFile);
+	fprintf(pFile, "}");
 }
 
 // ----------------------------------------------------------------------------
@@ -532,12 +554,16 @@ void print(const instruction& inst, const symbols& symbols, uint32_t inst_addres
 		fprintf(pFile, " ");
 		print(inst.op0, symbols, inst_address, pFile);
 	}
+	if (inst.bf0.valid)
+		print_bitfield(inst.bf0, pFile);
 
 	if (inst.op1.type != OpType::INVALID)
 	{
 		fprintf(pFile, ",");
 		print(inst.op1, symbols, inst_address, pFile);
 	}
+	if (inst.bf1.valid)
+		print_bitfield(inst.bf1, pFile);
 }
 
 // ----------------------------------------------------------------------------

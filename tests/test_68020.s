@@ -57,3 +57,10 @@ L1:
 	moves.w -(a5),d3
 	moves.w ([$100,a0],d1.w),d0
 	moves.w a5,([$100,a0,a3.w*4])
+
+	bfchg	(a0){15:3}
+	bfchg	2043(a0){30:d3}
+	bfclr	L2{d0:d7}
+	bfclr	(a0){d0:32}
+	bfexts	L2(pc){d0:32},d1
+L2:

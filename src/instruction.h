@@ -24,6 +24,9 @@ enum Opcode
 	BCLR,
 	BCS,
 	BEQ,
+	BFCHG,
+	BFCLR,
+	BFEXTS,
 	BGE,
 	BGT,
 	BHI,
@@ -337,6 +340,17 @@ struct operand
 	};
 };
 
+// offset/width for 68020 bitfield instructions.
+struct bitfield
+{
+	uint8_t valid;
+	uint8_t	offset_is_dreg;		// e.g "d3"
+	uint8_t	offset;				// value 0-31, or register 0-7
+	uint8_t	width_is_dreg;
+	uint8_t	width;				// value 0-31, or register 0-7
+};
+
+// ----------------------------------------------------------------------------
 enum class Suffix
 {
 	BYTE,
@@ -360,11 +374,13 @@ struct instruction
 
 	uint32_t	address;
 	uint16_t	header;			// first 16-bit word of data
-	uint16_t	byte_count;
+	uint16_t	byte_count;		// total number of bytes in the instruction
 	Opcode		opcode;
 	Suffix		suffix;
 	operand		op0;
+	bitfield	bf0;
 	operand		op1;
+	bitfield	bf1;
 };
 
 #endif
