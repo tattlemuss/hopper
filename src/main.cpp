@@ -81,6 +81,7 @@ const char* instruction_names[Opcode::COUNT] =
 	"lsr",
 	"move",
 	"movea",
+	"movec",
 	"movem",
 	"movep",
 	"moveq",
@@ -155,6 +156,19 @@ const char* g_index_register_names[] =
 	"a7",
 	"pc",
 	""
+};
+
+const char* g_control_register_names[ControlRegister::CR_COUNT] = 
+{
+	"?",
+	"sfc",
+	"dfc",
+	"usp",
+	"vbr",
+	"cacr",
+	"caar",
+	"msp",
+	"isp"
 };
 
 // ----------------------------------------------------------------------------
@@ -479,6 +493,9 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 			return;
 		case OpType::CCR:
 			fprintf(pFile, "ccr");
+			return;
+		case OpType::CONTROL_REGISTER:
+			fprintf(pFile, "%s", g_control_register_names[operand.control_register.cr]);
 			return;
 		default:
 			fprintf(pFile, "???");

@@ -76,6 +76,7 @@ enum Opcode
 	LSR,
 	MOVE,
 	MOVEA,
+	MOVEC,
 	MOVEM,
 	MOVEP,
 	MOVEQ,
@@ -166,9 +167,26 @@ enum OpType
 	SR,
 	USP,
 	CCR,
+	CONTROL_REGISTER		// (68010+), used in movec
 };
 
 // ----------------------------------------------------------------------------
+enum ControlRegister
+{
+	CR_UNKNOWN,
+	CR_SFC,		// 68010+
+	CR_DFC,		// 68010+
+	CR_USP,		// 68010+
+	CR_VBR,		// 68010+
+	CR_CACR,	// 68020+
+	CR_CAAR,	// 68020,68030
+	CR_MSP,		// 68020+
+	CR_ISP,		// 68020+
+	CR_COUNT
+};
+
+// ----------------------------------------------------------------------------
+// Any register used for indexing in indexed addressing modes.
 enum IndexRegister
 {
 	INDEX_REG_D0,
@@ -304,7 +322,17 @@ struct operand
 			int32_t inst_disp;		// offset from the base instruction address. Can be $7ffe+2 bytes max.
 		} relative_branch;
 
+		// Used in:
+		// INDIRECT_PREINDEXED
+		// INDIRECT_POSTINDEXED
+		// MEMORY_INDIRECT
+		// NO_MEMORY_INDIRECT
 		indirect_index_full		indirect_index_68020;
+
+		struct
+		{
+			ControlRegister cr;
+		} control_register;
 	};
 };
 

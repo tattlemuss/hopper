@@ -38,3 +38,20 @@ L1:
 	bkpt #$4
 	move.w ccr,(a0)
 	rtd #-$100
+
+	movec	sfc,d0
+	movec	dfc,d2
+	movec	usp,d4
+	movec	vbr,d6
+	movec	cacr,a1
+	movec	caar,a3
+	movec	msp,a4
+	movec	isp,a5
+	movec	d0,sfc
+	movec	d2,dfc
+	movec	d3,usp
+	movec	d6,vbr
+	movec	a0,cacr
+	movec	a2,caar
+	movec	a4,msp
+	movec	a6,isp

@@ -65,9 +65,49 @@ void set_postinc(operand& op, uint8_t reg)
 	op.indirect_postinc.reg = reg;
 }
 
+// ----------------------------------------------------------------------------
+static IndexRegister calc_index_register(bool d_or_a, uint16_t reg_number)
+{
+	if (d_or_a)
+		return (IndexRegister)(INDEX_REG_A0 + reg_number);
+	else
+		return (IndexRegister)(INDEX_REG_D0 + reg_number);
+}
+
+// ----------------------------------------------------------------------------
+static ControlRegister get_control_register(uint16_t reg_number, int cpu_type)
+{
+	if (cpu_type >= CPU_TYPE_68010)
+	{
+		if (reg_number == 0x0)
+			return ControlRegister::CR_SFC;
+		else if (reg_number == 0x1)
+			return ControlRegister::CR_DFC;
+		else if (reg_number == 0x800)
+			return ControlRegister::CR_USP;
+		else if (reg_number == 0x801)
+			return ControlRegister::CR_VBR;
+	}
+
+	if (cpu_type >= CPU_TYPE_68020)
+	{
+		if (reg_number == 0x2)
+			return ControlRegister::CR_CACR;	// NOTE 020/030 only, not 040+
+		else if (reg_number == 0x802)
+			return ControlRegister::CR_CAAR;	// NOTE 020/030 only, not 040+
+		else if (reg_number == 0x803)
+			return ControlRegister::CR_MSP;
+		else if (reg_number == 0x804)
+			return ControlRegister::CR_ISP;
+	}
+	return ControlRegister::CR_UNKNOWN;
+}
+
+// ----------------------------------------------------------------------------
 // Effective Address encoding modes.
 // Different instructions have different sets of EAs which are allowable to be used
-// for each operand. This ID flags which ones are allowed.
+// for each operand. This ID flags which ones are allowed. These modes are specified
+// in the PRM for each instruction type.
 enum class ea_group
 {
 	DATA_ALT		= 0,	// Data alterable (no A-reg, no PC-rel, no immedidate)
@@ -101,21 +141,8 @@ static bool mode_availability[][static_cast<int>(ea_group::COUNT)] =
 	{	false,  false,	false,	false,	false,	false,	false,	false,	false	}, // INVALID		   111 100
 };
 
-// There is a consistent approach to decoding the mode bits (0-6),
-// and when the mode is 7, using the register bits
-// Convert these mixed bits to a range [0-12)
-uint8_t decode_operand_type(uint8_t mode_bits, uint8_t reg_bits)
-{
-	if (mode_bits < 7)
-		return mode_bits;
-
-	if (reg_bits <= 4)
-		return  7 + reg_bits;
-
-	// Invalid!
-	return 7 + 5;
-}
-
+// ----------------------------------------------------------------------------
+// Table to convert from IS + IIS bits in full extension words, to a fundamental operand type.
 OpType g_full_extension_word_optypes[16] =
 {
 	// I/IS "Index/Indirect Selection"
@@ -141,6 +168,7 @@ OpType g_full_extension_word_optypes[16] =
 	INVALID,				// 1 111
 };
 
+// Table to convert from IS + IIS bits in full extension words, to a memory size to read.
 Size g_full_extension_outer_displacement_size[16] =
 {
 	Size::NONE,				// 0 000
@@ -162,10 +190,10 @@ Size g_full_extension_outer_displacement_size[16] =
 };
 
 // ----------------------------------------------------------------------------
-// Split 16 bit raw displacement into signed 8-bit offset, register reg_number and size
+// Split 16 bit raw brief extension word, into signed 8-bit offset, register reg_number and size
 // e.g n(pc,d0.w) or n(a0,d0.w)
 // Additionally add scaling factor on 020+ machines
-void decode_brief_extension_word(uint16_t word, int cpu_type, int8_t& disp, index_indirect& info)
+void decode_brief_index_indirect(uint16_t word, int cpu_type, int8_t& disp, index_indirect& info)
 {
 	// The offset is 8-bits
 	disp = (int8_t)(word & 0xff);
@@ -176,10 +204,9 @@ void decode_brief_extension_word(uint16_t word, int cpu_type, int8_t& disp, inde
 
 	uint8_t reg_number = (word >> 12) & 7;
 	uint8_t d_or_a = (word >> 15) & 1;
-	if (cpu_type >= CPU_TYPE_68020 && d_or_a)
-		info.index_reg = (IndexRegister)(INDEX_REG_A0 + reg_number);
-	else
-		info.index_reg = (IndexRegister)(INDEX_REG_D0 + reg_number);
+	if (cpu_type < CPU_TYPE_68020)
+		d_or_a = 0;
+	info.index_reg = calc_index_register(d_or_a, reg_number);
 }
 
 // ----------------------------------------------------------------------------
@@ -268,7 +295,7 @@ int decode_full_extension_word(buffer_reader& buffer, int cpu_type, uint16_t wor
 	// Decode shared parts for the index register
 	index_indirect brief;
 	int8_t disp;
-	decode_brief_extension_word(word, cpu_type, disp, brief);
+	decode_brief_index_indirect(word, cpu_type, disp, brief);
 	full_result->index = brief;
 	return 0;
 }
@@ -313,7 +340,17 @@ int decode_ea(buffer_reader& buffer, const decode_settings& dsettings, operand& 
 	uint32_t inst_address)
 {
 	// Convert to an operand type
-	int ea_type = decode_operand_type(mode_bits, reg_bits);
+	// There is a consistent approach to decoding the mode bits (0-6),
+	// and when the mode is 7, using the register bits
+	// Convert these mixed bits to a range [0-12)
+	int ea_type = mode_bits;
+	if (mode_bits == 7)
+	{
+		if (reg_bits <= 4)
+			ea_type = 7 + reg_bits;
+		else
+			ea_type = 7 + 5; // invalid mode
+	}
 
 	// Check EA type is valid for this instruction
 	bool allow = mode_availability[ea_type][(int)group];
@@ -391,7 +428,8 @@ int decode_ea(buffer_reader& buffer, const decode_settings& dsettings, operand& 
 			if ((dsettings.cpu_type >= CPU_TYPE_68020) && full_extension_bit)
 			{
 				// This can be overridden (set to "none") by the following call
-				operand.indirect_index_68020.base_register = (IndexRegister)(INDEX_REG_A0 + reg_bits);
+				operand.indirect_index_68020.base_register = calc_index_register(1, reg_bits);
+				
 				// extended 68020 modes with full extension word.
 				if (decode_full_extension_word(buffer, dsettings.cpu_type, val16, 0, operand))
 					return 1;
@@ -400,7 +438,7 @@ int decode_ea(buffer_reader& buffer, const decode_settings& dsettings, operand& 
 			{
 				// The result depends on the extension word bit 8!
 				operand.indirect_index.a_reg = reg_bits;
-				decode_brief_extension_word(val16, dsettings.cpu_type, operand.indirect_index.disp,
+				decode_brief_index_indirect(val16, dsettings.cpu_type, operand.indirect_index.disp,
 					operand.indirect_index.indirect_info);
 			}
 			return 0;
@@ -438,7 +476,7 @@ int decode_ea(buffer_reader& buffer, const decode_settings& dsettings, operand& 
 			}
 			else
 			{
-				decode_brief_extension_word(val16, dsettings.cpu_type, disp8, operand.pc_disp_index.indirect_info);
+				decode_brief_index_indirect(val16, dsettings.cpu_type, disp8, operand.pc_disp_index.indirect_info);
 				operand.pc_disp_index.inst_disp = read_address - inst_address + disp8;
 			}
 			return 0;
@@ -868,6 +906,37 @@ int Inst_rtd(buffer_reader& buffer, const decode_settings& dsettings, instructio
 	if (buffer.read_word(val))
 		return 1;
 	set_imm_word_signed(inst.op0, (int16_t)val);
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
+int Inst_movec (buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+{
+	uint8_t direction = (header & 1);		// 1== general -> control
+	uint16_t val;
+	if (buffer.read_word(val))
+		return 1;
+
+	uint8_t reg_index = (val >> 12) & 7;
+	uint8_t d_or_a = (val >> 15) & 1;
+	uint16_t cr = (val & 0xfff);
+	ControlRegister ctrl = get_control_register(cr, dsettings.cpu_type);
+	if (ctrl == ControlRegister::CR_UNKNOWN)
+		return 1;
+
+	// Decide src/dst operands
+	operand& op_cr = (direction) ? inst.op1 : inst.op0;
+	operand& op_reg = (direction) ? inst.op0 : inst.op1;
+
+	// Fill operands out
+	inst.suffix = Suffix::NONE;
+	op_cr.type = OpType::CONTROL_REGISTER;
+	op_cr.control_register.cr = ctrl;
+
+	if (d_or_a)
+		set_areg(op_reg, reg_index);
+	else
+		set_dreg(op_reg, reg_index);
 	return 0;
 }
 
@@ -1406,6 +1475,7 @@ const matcher_entry g_matcher_table_0100[] =
 	MATCH_ENTRY1_IMPL(0,16,0b0100111001110111,		CPU_MIN_68000, RTR,			Inst_simple ),
 	MATCH_ENTRY1_IMPL(0,16,0b0100111001110010,		CPU_MIN_68000, STOP,		Inst_stop ),
 	MATCH_ENTRY1_IMPL(0,16,0b0100111001110100,		CPU_MIN_68010, RTD,			Inst_rtd ),
+	MATCH_ENTRY1_IMPL(1,15,0b010011100111101,		CPU_MIN_68010, MOVEC,		Inst_movec ),
 
 	MATCH_ENTRY1_IMPL(3,13,0b0100100001001,			CPU_MIN_68010, BKPT,		Inst_bkpt ),
 	MATCH_ENTRY1_IMPL(3,13,0b0100100001000,			CPU_MIN_68000, SWAP,		Inst_swap ),
@@ -1418,7 +1488,7 @@ const matcher_entry g_matcher_table_0100[] =
 	MATCH_ENTRY1_IMPL(3,13,0b0100100011000,			CPU_MIN_68000, EXT,			Inst_ext ),
 	//([ ( 3,13, 0b0100100011000)			  ,		CPU_MIN_68000, "EXTB.L",	Inst_ext ),	 # not on 68000
 	MATCH_ENTRY1_IMPL(4,12,0b010011100100,			CPU_MIN_68000, TRAP,		Inst_trap ),
-	MATCH_ENTRY1_IMPL(6,10,0b0100000011,			CPU_MIN_68000, MOVE,		Inst_move_from_sr ),   // supervisor
+	MATCH_ENTRY1_IMPL(6,10,0b0100000011,			CPU_MIN_68000, MOVE,		Inst_move_from_sr ),   // supervisor on 68010+
 	MATCH_ENTRY1_IMPL(6,10,0b0100011011,			CPU_MIN_68000, MOVE,		Inst_move_to_sr ),   // supervisor
 	//([ ( 6,10, 0b0100001011)				 ,		CPU_MIN_68000, "MOVE FROM Ccr",	 Inst ),		  # not on 68000
 	MATCH_ENTRY1_IMPL(6,10,0b0100010011,			CPU_MIN_68000, MOVE,		Inst_move_to_ccr ),
