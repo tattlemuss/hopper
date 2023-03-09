@@ -1774,6 +1774,8 @@ int decode(buffer_reader& buffer, const decode_settings& dsettings, instruction&
 	inst.byte_count = 2;	// assume error
 	inst.opcode = Opcode::NONE;
 	inst.suffix = Suffix::NONE;
+	inst.op0.type = OpType::INVALID;
+	inst.op1.type = OpType::INVALID;
 	inst.bf0.valid = 0;
 	inst.bf1.valid = 0;
 
@@ -1816,8 +1818,11 @@ int decode(buffer_reader& buffer, const decode_settings& dsettings, instruction&
 		{
 			// Handle decode func being partway through and failing
 			inst.opcode = Opcode::NONE;
+			inst.suffix = Suffix::NONE;
 			inst.op0.type = OpType::INVALID;
 			inst.op1.type = OpType::INVALID;
+			inst.bf0.valid = 0;
+			inst.bf1.valid = 0;
 			return res;	// failed to decode
 		}
 
