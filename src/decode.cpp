@@ -1179,8 +1179,18 @@ int Inst_branch(buffer_reader& buffer, const decode_settings& dsettings, instruc
 		uint16_t disp16;
 		if (buffer.read_word(disp16))
 			return 1;
-		inst.op0.relative_branch.inst_disp = read_disp + (int16_t)disp16;
-		inst.suffix = Suffix::WORD;
+			inst.op0.relative_branch.inst_disp = read_disp + (int16_t)disp16;
+			inst.suffix = Suffix::WORD;
+	}
+	else if (dsettings.cpu_type >= CPU_TYPE_68020 && disp8 == -1)
+	{
+		// Support long branches for 68020+ only
+		uint32_t disp32;
+		if (buffer.read_long(disp32))
+			return 1;
+
+		inst.op0.relative_branch.inst_disp = read_disp + (int32_t)disp32;
+		inst.suffix = Suffix::LONG;
 	}
 	else
 	{

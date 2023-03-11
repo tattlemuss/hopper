@@ -69,3 +69,4 @@ L1:
 	bfset	2(a0){1:10}
 	bftst	L2(pc){1:10}
 L2:
+	bsr.l	L1
