@@ -53,6 +53,7 @@ const char* instruction_names[Opcode::COUNT] =
 	"btst",
 	"bvc",
 	"bvs",
+	"callm",
 	"chk",
 	"clr",
 	"cmp",

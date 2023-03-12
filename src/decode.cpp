@@ -821,6 +821,23 @@ int Inst_btst_imm(buffer_reader& buffer, const decode_settings& dsettings, instr
 }
 
 // ----------------------------------------------------------------------------
+int Inst_callm(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+{
+	uint8_t mode = (header >> 3) & 7;
+	uint8_t reg  = (header >> 0) & 7;
+
+	// Read the immediate data
+	uint16_t imm;
+	if (buffer.read_word(imm))
+		return 1;
+	if (imm & 0xff00)			   // top bits must be 0
+		return 1;
+
+	set_imm_byte(inst.op0, (imm >> 0) & 0xff);
+	return decode_ea(buffer, dsettings, inst.op1, ea_group::CONTROL, mode, reg, Size::NONE, inst.address);
+}
+
+// ----------------------------------------------------------------------------
 int Inst_moves(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
 {
 	uint8_t size = (header >> 6) & 3;
@@ -1531,6 +1548,7 @@ struct matcher_entry
 #define CPU_MIN_68000			(1<<CPU_TYPE_68000)|(1<<CPU_TYPE_68010)|(1<<CPU_TYPE_68020)|(1<<CPU_TYPE_68030)
 #define CPU_MIN_68010			                    (1<<CPU_TYPE_68010)|(1<<CPU_TYPE_68020)|(1<<CPU_TYPE_68030)
 #define CPU_MIN_68020			                                        (1<<CPU_TYPE_68020)|(1<<CPU_TYPE_68030)
+#define CPU_68020			     	                                    (1<<CPU_TYPE_68020)
 
 const matcher_entry g_matcher_table_0000[] =
 {
@@ -1545,17 +1563,18 @@ const matcher_entry g_matcher_table_0000[] =
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b101001,	CPU_MIN_68000, MOVEP,		Inst_movep_mem_reg ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b110001,	CPU_MIN_68000, MOVEP,		Inst_movep_reg_mem ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b111001,	CPU_MIN_68000, MOVEP,		Inst_movep_reg_mem ),
+	MATCH_ENTRY1_IMPL(6,10,0b0000011011,			CPU_68020,     CALLM,		Inst_callm ),
 	MATCH_ENTRY1_IMPL(6,10,0b0000100001,			CPU_MIN_68000, BCHG,		Inst_bchg_imm ),
 	MATCH_ENTRY1_IMPL(6,10,0b0000100010,			CPU_MIN_68000, BCLR,		Inst_bchg_imm ),
 	MATCH_ENTRY1_IMPL(6,10,0b0000100011,			CPU_MIN_68000, BSET,		Inst_bchg_imm ),
 	MATCH_ENTRY1_IMPL(6,10,0b0000100000,			CPU_MIN_68000, BTST,		Inst_btst_imm ),
-	MATCH_ENTRY1_IMPL(8,8,0b00000000,				CPU_MIN_68000, ORI,			Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00000010,				CPU_MIN_68000, ANDI,		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00000100,				CPU_MIN_68000, SUBI,		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00000110,				CPU_MIN_68000, ADDI,		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00001010,				CPU_MIN_68000, EORI,		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00001100,				CPU_MIN_68000, CMPI,		Inst_integer_imm_ea ),
-	MATCH_ENTRY1_IMPL(8,8,0b00001110,				CPU_MIN_68010, MOVES,		Inst_moves ),
+	MATCH_ENTRY1_IMPL( 8,8,0b00000000,				CPU_MIN_68000, ORI,			Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL( 8,8,0b00000010,				CPU_MIN_68000, ANDI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL( 8,8,0b00000100,				CPU_MIN_68000, SUBI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL( 8,8,0b00000110,				CPU_MIN_68000, ADDI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL( 8,8,0b00001010,				CPU_MIN_68000, EORI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL( 8,8,0b00001100,				CPU_MIN_68000, CMPI,		Inst_integer_imm_ea ),
+	MATCH_ENTRY1_IMPL( 8,8,0b00001110,				CPU_MIN_68010, MOVES,		Inst_moves ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b101,		CPU_MIN_68000, BCHG,		Inst_bchg ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b110,		CPU_MIN_68000, BCLR,		Inst_bchg ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 6,3,0b111,		CPU_MIN_68000, BSET,		Inst_bchg ),

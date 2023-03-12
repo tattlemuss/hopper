@@ -48,6 +48,7 @@ enum Opcode
 	BTST,
 	BVC,
 	BVS,
+	CALLM,
 	CHK,
 	CLR,
 	CMP,

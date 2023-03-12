@@ -70,5 +70,3 @@ L1:
 	bftst	L2(pc){1:10}
 L2:
 	bsr.l	L1
-	callm	#$ff,0(a6,d0.w*8)
-	callm	#$34,L2(pc)
