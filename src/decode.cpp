@@ -1888,8 +1888,7 @@ const matcher_entry* g_matcher_tables[16] =
 };
 
 // ----------------------------------------------------------------------------
-// decode a single instruction if possible
-int decode(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst)
+void decode(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst)
 {
 	inst.reset();
 
@@ -1899,7 +1898,7 @@ int decode(buffer_reader& buffer, const decode_settings& dsettings, instruction&
 	uint16_t cpu_mask = (1 << dsettings.cpu_type);
 
 	if (buffer.get_remain() < 2)
-		return 1;
+		return;
 
 	inst.address = buffer.get_address();
 	buffer.read_word(header0);
@@ -1932,13 +1931,11 @@ int decode(buffer_reader& buffer, const decode_settings& dsettings, instruction&
 		{
 			// Handle decode func being partway through and failing
 			inst.reset();
-			return res;	// failed to decode
+			return;	// failed to decode
 		}
 
+		// Successful decode, fill in the remaining data.
 		inst.byte_count = reader_tmp.get_pos() - start_pos;
-		return res;
+		return;
 	}
-
-	// no match found
-	return 1;
 }

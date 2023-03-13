@@ -17,6 +17,8 @@ struct decode_settings
 	int cpu_type;
 };
 
-extern int decode(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst);
+// decode a single instruction. The instruction's opcode will be set to "invalid", with a byte
+// size of 2, if no match was found.
+extern void decode(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst);
 
 #endif

@@ -61,7 +61,10 @@ int decode_buf(buffer_reader& buf, const decode_settings& dsettings, const symbo
 
 		// decode uses a copy of the buffer state
 		buffer_reader buf_copy(buf);
-		int res = decode(buf_copy, dsettings, line.inst);
+
+		// We can ignore the return code, since it just says "this instruction is valid"
+		// rather than "something catastrophic happened"
+		decode(buf_copy, dsettings, line.inst);
 
 		// Handle failure
 		disasm.lines.push_back(line);
@@ -608,6 +611,11 @@ int process_tos_file(const uint8_t* pData, long size, const decode_settings& dse
 
 	fprintf(pOutput, "; Reading symbols...\n");
 	int ret = read_symbols(symbol_buf, header, exe_symbols);
+	if (ret)
+	{
+		fprintf(stderr, "Error reading symbol table\n");
+		return ret;
+	}
 
 	disassembly disasm;
 	if (decode_buf(text_buf, dsettings, exe_symbols, disasm))
@@ -681,14 +689,19 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	int r = fseek(pInfile, 0, SEEK_END);
+	(void) fseek(pInfile, 0, SEEK_END);
 	long size = ftell(pInfile);
 
 	rewind(pInfile);
 
 	uint8_t* pData = (uint8_t*) malloc(size);
-	int readBytes = fread(pData, 1, size, pInfile);
+	long readBytes = fread(pData, 1, size, pInfile);
 	fclose(pInfile);
+	if (readBytes != size)
+	{
+		fprintf(stderr, "Failed to read file contents\n");
+		return 1;
+	}
 
 	if (is_tos)
 		return process_tos_file(pData, size, dsettings, psettings, stdout);

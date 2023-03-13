@@ -7,7 +7,7 @@ CPP_SRC=./main.cpp ./decode.cpp ./instruction.cpp ./symbols.cpp ./timing.cpp
 
 CPP_OBJ=$(CPP_SRC:${SRC_PATH}/%.cpp=${SRC_PATH}/%.o)
 CPP_DEPS=$(CPP_SRC:${SRC_PATH}/%.cpp=${SRC_PATH}/%.d)
-CFLAGS=-I${SRC_PATH}/lib -std=c++11 -MMD -DNDEBUG -g
+CFLAGS=-I${SRC_PATH}/lib -std=c++11 -MMD -DDEBUG -g -Wall
 
 LDFLAGS=-lstdc++ -g
 
