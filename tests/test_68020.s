@@ -76,3 +76,5 @@ L2:
 	cas.b	d1,d3,(a7)
 	cas.w	d1,d3,(a7)
 	cas.l	d0,d7,-(a7)
+
+	cas2.w	d6:d1,d2:d3,(a5):(d4)

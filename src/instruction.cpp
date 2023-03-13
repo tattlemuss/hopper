@@ -44,6 +44,7 @@ const char* g_opcode_names[Opcode::COUNT] =
 	"bvs",
 	"callm",
 	"cas",
+	"cas2",
 	"chk",
 	"clr",
 	"cmp",

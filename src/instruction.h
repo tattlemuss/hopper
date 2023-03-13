@@ -50,6 +50,7 @@ enum Opcode
 	BVS,
 	CALLM,
 	CAS,
+	CAS2,
 	CHK,
 	CLR,
 	CMP,
@@ -173,6 +174,8 @@ enum OpType
 	INDIRECT_POSTINDEXED,	// (68020+)
 	MEMORY_INDIRECT,		// (68020+)
 	NO_MEMORY_INDIRECT,		// (68020+)
+	D_REGISTER_PAIR,		// (68020+)  "d0:d1"
+	INDIRECT_REGISTER_PAIR,	// (68020+)  "Rn:Rn"
 
 	// Specific registers
 	SR,
@@ -344,6 +347,19 @@ struct operand
 		{
 			ControlRegister cr;
 		} control_register;
+
+		struct
+		{
+			uint8_t dreg1;
+			uint8_t dreg2;
+		} d_register_pair;
+
+		struct
+		{
+			IndexRegister reg1;
+			IndexRegister reg2;
+		} indirect_register_pair;
+		
 	};
 };
 

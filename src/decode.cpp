@@ -900,6 +900,36 @@ int Inst_cas(buffer_reader& buffer, const decode_settings& dsettings, instructio
 }
 
 // ----------------------------------------------------------------------------
+int Inst_cas2(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+{
+	uint8_t size = (header >> 9) & 3;
+	// Byte size is not allowed
+	Size sizes[] = { Size::NONE, Size::NONE, Size::WORD, Size::LONG };
+	Size ea_size = sizes[size];
+	if (ea_size == Size::NONE)
+		return 1;
+
+	uint16_t val1, val2;
+	if (buffer.read_word(val1))
+		return 1;
+	if (buffer.read_word(val2))
+		return 1;
+
+	inst.suffix = size_to_suffix(ea_size);
+	inst.op0.type = D_REGISTER_PAIR;
+	inst.op0.d_register_pair.dreg1 = (val1 >> 0) & 7;
+	inst.op0.d_register_pair.dreg2 = (val2 >> 0) & 7;
+	inst.op1.type = D_REGISTER_PAIR;
+	inst.op1.d_register_pair.dreg1 = (val1 >> 6) & 7;
+	inst.op1.d_register_pair.dreg2 = (val2 >> 6) & 7;
+
+	inst.op2.type = INDIRECT_REGISTER_PAIR;
+	inst.op2.indirect_register_pair.reg1 = calc_index_register((val1 >> 15) & 1, (val1 >> 12) & 7);
+	inst.op2.indirect_register_pair.reg2 = calc_index_register((val2 >> 15) & 1, (val2 >> 12) & 7);
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
 int Inst_alu_dreg(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
 {
 	uint8_t dreg = (header >> 9) & 7;
@@ -1582,6 +1612,7 @@ const matcher_entry g_matcher_table_0000[] =
 	MATCH_ENTRY1_IMPL(0,16,0b0000000000111100,		CPU_MIN_68000, ORI,			Inst_imm_ccr ),
 	MATCH_ENTRY1_IMPL(0,16,0b0000000001111100,		CPU_MIN_68000, ORI,			Inst_imm_sr ), // supervisor
 	MATCH_ENTRY1_IMPL(0,16,0b0000001001111100,		CPU_MIN_68000, ANDI,		Inst_imm_sr ), // supervisor
+	MATCH_ENTRY2_IMPL(11,5,0b00001,0,9,0b011111100,	CPU_MIN_68020, CAS2,		Inst_cas2 ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b100001,	CPU_MIN_68000, MOVEP,		Inst_movep_mem_reg ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b101001,	CPU_MIN_68000, MOVEP,		Inst_movep_mem_reg ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b110001,	CPU_MIN_68000, MOVEP,		Inst_movep_reg_mem ),

@@ -330,6 +330,14 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 			else
 				fprintf(pFile, "#$%x", operand.imm.val0);
 			return;
+		case OpType::D_REGISTER_PAIR:
+			fprintf(pFile, "d%u:d%u", operand.d_register_pair.dreg1, operand.d_register_pair.dreg2);
+			return;
+		case OpType::INDIRECT_REGISTER_PAIR:
+			fprintf(pFile, "(%s):(%s)",
+				get_index_register_string(operand.indirect_register_pair.reg1),
+				get_index_register_string(operand.indirect_register_pair.reg2));
+			return;
 		case OpType::SR:
 			fprintf(pFile, "sr");
 			return;
