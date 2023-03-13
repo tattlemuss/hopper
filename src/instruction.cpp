@@ -226,7 +226,7 @@ const char* get_suffix_string(Suffix suffix)
 }
 
 // ----------------------------------------------------------------------------
-const char* get_movem_reg_string(int movem_reg)
+const char* get_movem_reg_string(uint16_t movem_reg)
 {
 	if (movem_reg < ARRAY_SIZE(g_movem_reg_names))
 		return g_movem_reg_names[movem_reg];
@@ -234,10 +234,10 @@ const char* get_movem_reg_string(int movem_reg)
 }
 
 // ----------------------------------------------------------------------------
-const char* get_scale_shift_string(int scale)
+const char* get_scale_shift_string(uint16_t scale_shift)
 {
-	if (scale < ARRAY_SIZE(g_scale_names))
-		return g_scale_names[scale];
+	if (scale_shift < ARRAY_SIZE(g_scale_names))
+		return g_scale_names[scale_shift];
 	return "?";
 }
 

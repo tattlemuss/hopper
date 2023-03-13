@@ -374,8 +374,8 @@ extern const char* get_index_register_string(IndexRegister reg);
 extern const char* get_control_register_string(ControlRegister reg);
 extern const char* get_suffix_string(Suffix suffix);
 // Convert from MOVEM register number to a string
-extern const char* get_movem_reg_string(int movem_reg);
-extern const char* get_scale_shift_string(int scale);
+extern const char* get_movem_reg_string(uint16_t movem_reg);
+extern const char* get_scale_shift_string(uint16_t scale_shift);
 
 // ----------------------------------------------------------------------------
 // A decoded instruction split into its constituent parts.
