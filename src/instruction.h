@@ -49,6 +49,7 @@ enum Opcode
 	BVC,
 	BVS,
 	CALLM,
+	CAS,
 	CHK,
 	CLR,
 	CMP,
@@ -378,15 +379,31 @@ struct instruction
 	{
 	}
 
+	void reset()
+	{
+		// This effectively sets the instruction to a "dc.w" statement
+		byte_count = 2U;
+		opcode = Opcode::NONE;
+		suffix = Suffix::NONE;
+		op0.type = OpType::INVALID;
+		op1.type = OpType::INVALID;
+		op2.type = OpType::INVALID;
+		bf0.valid = 0;
+		bf1.valid = 0;
+	}
+
 	uint32_t	address;
 	uint16_t	header;			// first 16-bit word of data
 	uint16_t	byte_count;		// total number of bytes in the instruction
 	Opcode		opcode;
 	Suffix		suffix;
+
+	// operands and matching bitfields, when applicable
 	operand		op0;
 	bitfield	bf0;
 	operand		op1;
 	bitfield	bf1;
+	operand		op2;
 };
 
 #endif

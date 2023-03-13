@@ -54,6 +54,7 @@ const char* instruction_names[Opcode::COUNT] =
 	"bvc",
 	"bvs",
 	"callm",
+	"cas",
 	"chk",
 	"clr",
 	"cmp",
@@ -570,6 +571,12 @@ void print(const instruction& inst, const symbols& symbols, uint32_t inst_addres
 	}
 	if (inst.bf1.valid)
 		print_bitfield(inst.bf1, pFile);
+
+	if (inst.op2.type != OpType::INVALID)
+	{
+		fprintf(pFile, ",");
+		print(inst.op2, symbols, inst_address, pFile);
+	}
 }
 
 // ----------------------------------------------------------------------------

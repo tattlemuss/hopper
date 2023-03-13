@@ -877,6 +877,29 @@ int Inst_bchg(buffer_reader& buffer, const decode_settings& dsettings, instructi
 }
 
 // ----------------------------------------------------------------------------
+int Inst_cas(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+{
+	uint8_t size = (header >> 9) & 3;
+	uint8_t mode = (header >> 3) & 7;
+	uint8_t reg  = (header >> 0) & 7;
+	Size sizes[] = { Size::NONE, Size::BYTE, Size::WORD, Size::LONG };
+	Size ea_size = sizes[size];
+	if (ea_size == Size::NONE)
+		return 1;
+
+	uint16_t val;
+	if (buffer.read_word(val))
+		return 1;
+
+	uint8_t du = (val >> 6) & 7;
+	uint8_t dc = (val >> 0) & 7;
+	set_dreg(inst.op0, dc);
+	set_dreg(inst.op1, du);
+	inst.suffix = size_to_suffix(ea_size);
+	return decode_ea(buffer, dsettings, inst.op2, ea_group::MEM_ALT, mode, reg, ea_size, inst.address);
+}
+
+// ----------------------------------------------------------------------------
 int Inst_alu_dreg(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
 {
 	uint8_t dreg = (header >> 9) & 7;
@@ -1563,6 +1586,7 @@ const matcher_entry g_matcher_table_0000[] =
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b101001,	CPU_MIN_68000, MOVEP,		Inst_movep_mem_reg ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b110001,	CPU_MIN_68000, MOVEP,		Inst_movep_reg_mem ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b111001,	CPU_MIN_68000, MOVEP,		Inst_movep_reg_mem ),
+	MATCH_ENTRY2_IMPL(11,5,0b00001, 6,3,0b011,		CPU_MIN_68020, CAS,			Inst_cas ),
 	MATCH_ENTRY1_IMPL(6,10,0b0000011011,			CPU_68020,     CALLM,		Inst_callm ),
 	MATCH_ENTRY1_IMPL(6,10,0b0000100001,			CPU_MIN_68000, BCHG,		Inst_bchg_imm ),
 	MATCH_ENTRY1_IMPL(6,10,0b0000100010,			CPU_MIN_68000, BCLR,		Inst_bchg_imm ),
@@ -1836,13 +1860,7 @@ const matcher_entry* g_matcher_tables[16] =
 // decode a single instruction if possible
 int decode(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst)
 {
-	inst.byte_count = 2;	// assume error
-	inst.opcode = Opcode::NONE;
-	inst.suffix = Suffix::NONE;
-	inst.op0.type = OpType::INVALID;
-	inst.op1.type = OpType::INVALID;
-	inst.bf0.valid = 0;
-	inst.bf1.valid = 0;
+	inst.reset();
 
 	// Check remaining size
 	uint16_t header0 = 0;
@@ -1882,12 +1900,7 @@ int decode(buffer_reader& buffer, const decode_settings& dsettings, instruction&
 		if (res)
 		{
 			// Handle decode func being partway through and failing
-			inst.opcode = Opcode::NONE;
-			inst.suffix = Suffix::NONE;
-			inst.op0.type = OpType::INVALID;
-			inst.op1.type = OpType::INVALID;
-			inst.bf0.valid = 0;
-			inst.bf1.valid = 0;
+			inst.reset();
 			return res;	// failed to decode
 		}
 

@@ -72,3 +72,7 @@ L2:
 	bsr.l	L1
 	callm	#$ff,0(a6,d0.w*8)
 	callm	#$34,L2(pc)
+
+	cas.b	d1,d3,(a7)
+	cas.w	d1,d3,(a7)
+	cas.l	d0,d7,-(a7)
