@@ -11,177 +11,6 @@
 #include "symbols.h"
 #include "timing.h"
 
-const char* instruction_names[Opcode::COUNT] =
-{
-	"none",
-	"abcd",
-	"add",
-	"adda",
-	"addi",
-	"addq",
-	"addx",
-	"and",
-	"andi",
-	"asl",
-	"asr",
-	"bcc",
-	"bchg",
-	"bclr",
-	"bcs",
-	"beq",
-	"bfchg",
-	"bfclr",
-	"bfexts",
-	"bfextu",
-	"bfffo",
-	"bfins",
-	"bfset",
-	"bftst",
-	"bge",
-	"bgt",
-	"bhi",
-	"bkpt",
-	"ble",
-	"bls",
-	"blt",
-	"bmi",
-	"bne",
-	"bpl",
-	"bra",
-	"bset",
-	"bsr",
-	"btst",
-	"bvc",
-	"bvs",
-	"callm",
-	"cas",
-	"chk",
-	"clr",
-	"cmp",
-	"cmpi",
-	"cmpa",
-	"cmpm",
-	"dbcc",
-	"dbcs",
-	"dbeq",
-	"dbf",
-	"dbge",
-	"dbgt",
-	"dbhi",
-	"dble",
-	"dbls",
-	"dblt",
-	"dbmi",
-	"dbne",
-	"dbpl",
-	"dbvc",
-	"dbvs",
-	"divs",
-	"divu",
-	"eor",
-	"eori",
-	"exg",
-	"ext",
-	"illegal",
-	"jmp",
-	"jsr",
-	"lea",
-	"link",
-	"lsl",
-	"lsr",
-	"move",
-	"movea",
-	"movec",
-	"movem",
-	"movep",
-	"moveq",
-	"moves",
-	"muls",
-	"mulu",
-	"nbcd",
-	"neg",
-	"negx",
-	"nop",
-	"not",
-	"or",
-	"ori",
-	"pea",
-	"reset",
-	"rol",
-	"ror",
-	"roxl",
-	"roxr",
-	"rtd",
-	"rte",
-	"rtr",
-	"rts",
-	"sbcd",
-	"scc",
-	"scs",
-	"seq",
-	"sf",
-	"sge",
-	"sgt",
-	"shi",
-	"sle",
-	"sls",
-	"slt",
-	"smi",
-	"sne",
-	"spl",
-	"st",
-	"stop",
-	"sub",
-	"suba",
-	"subi",
-	"subq",
-	"subx",
-	"svc",
-	"svs",
-	"swap",
-	"tas",
-	"trap",
-	"trapv",
-	"tst",
-	"unlk"
-};
-
-// ----------------------------------------------------------------------------
-const char* g_index_register_names[] =
-{
-	"d0",
-	"d1",
-	"d2",
-	"d3",
-	"d4",
-	"d5",
-	"d6",
-	"d7",
-	"a0",
-	"a1",
-	"a2",
-	"a3",
-	"a4",
-	"a5",
-	"a6",
-	"a7",
-	"pc",
-	""
-};
-
-const char* g_control_register_names[ControlRegister::CR_COUNT] = 
-{
-	"?",
-	"sfc",
-	"dfc",
-	"usp",
-	"vbr",
-	"cacr",
-	"caar",
-	"msp",
-	"isp"
-};
-
 // ----------------------------------------------------------------------------
 //	INSTRUCTION ANALYSIS
 // ----------------------------------------------------------------------------
@@ -251,29 +80,15 @@ struct print_settings
 	bool show_timings;
 };
 
-static const char* g_reg_names[] =
-{
-	"d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
-	"a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7"
-};
-
-static const char* g_scale_names[] =
-{
-	"",
-	"*2",
-	"*4",
-	"*8"
-};
-
 // ----------------------------------------------------------------------------
 static void print_index_indirect(const index_indirect& ind, FILE* pFile)
 {
 	if (ind.index_reg == INDEX_REG_NONE)
 		return;
 	fprintf(pFile, "%s.%s%s",
-		g_index_register_names[ind.index_reg],
+		get_index_register_string(ind.index_reg),
 		ind.is_long ? "l" : "w",
-		g_scale_names[ind.scale_shift]);
+		get_scale_shift_string(ind.scale_shift));
 }
 
 // ----------------------------------------------------------------------------
@@ -376,7 +191,7 @@ static void print_indexed_68020(const indirect_index_full& ref, const symbols& s
 						fprintf(pFile, "$%x", ref.base_displacement);
 					break;
 				case 1:
-					fprintf(pFile, "%s", g_index_register_names[ref.base_register]); break;
+					fprintf(pFile, "%s", get_index_register_string(ref.base_register)); break;
 				case 2:
 					print_index_indirect(ref.index, pFile); break;
 				case 3:
@@ -458,17 +273,17 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 			{
 				fprintf(pFile, "%s(pc,%s.%s%s)",
 						sym.label.c_str(),
-						g_index_register_names[operand.pc_disp_index.indirect_info.index_reg],
+						get_index_register_string(operand.pc_disp_index.indirect_info.index_reg),
 						operand.pc_disp_index.indirect_info.is_long ? "l" : "w",
-						g_scale_names[operand.pc_disp_index.indirect_info.scale_shift]);
+						get_scale_shift_string(operand.pc_disp_index.indirect_info.scale_shift));
 			}
 			else
 			{
 				fprintf(pFile, "$%x(pc,%s.%s%s)",
 					target_address,
-					g_index_register_names[operand.pc_disp_index.indirect_info.index_reg],
+					get_index_register_string(operand.pc_disp_index.indirect_info.index_reg),
 					operand.pc_disp_index.indirect_info.is_long ? "l" : "w",
-					g_scale_names[operand.pc_disp_index.indirect_info.scale_shift]);
+					get_scale_shift_string(operand.pc_disp_index.indirect_info.scale_shift));
 			}
 			return;
 		}
@@ -480,7 +295,7 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 				{
 					if (!first)
 						fprintf(pFile, "/");
-					fprintf(pFile, "%s", g_reg_names[i]);
+					fprintf(pFile, "%s", get_movem_reg_string(i));
 					first = false;
 				}
 			return;
@@ -525,7 +340,7 @@ void print(const operand& operand, const symbols& symbols, uint32_t inst_address
 			fprintf(pFile, "ccr");
 			return;
 		case OpType::CONTROL_REGISTER:
-			fprintf(pFile, "%s", g_control_register_names[operand.control_register.cr]);
+			fprintf(pFile, "%s", get_control_register_string(operand.control_register.cr));
 			return;
 		default:
 			fprintf(pFile, "???");
@@ -540,21 +355,8 @@ void print(const instruction& inst, const symbols& symbols, uint32_t inst_addres
 		fprintf(pFile, "dc.w $%x", inst.header);
 		return;
 	}
-	fprintf(pFile, "%s", instruction_names[inst.opcode]);
-
-	switch (inst.suffix)
-	{
-		case Suffix::BYTE:
-			fprintf(pFile, ".b"); break;
-		case Suffix::WORD:
-			fprintf(pFile, ".w"); break;
-		case Suffix::LONG:
-			fprintf(pFile, ".l"); break;
-		case Suffix::SHORT:
-			fprintf(pFile, ".s"); break;
-		default:
-			break;
-	}
+	fprintf(pFile, "%s", get_opcode_string(inst.opcode));
+	fprintf(pFile, "%s", get_suffix_string(inst.suffix));
 
 	if (inst.op0.type != OpType::INVALID)
 	{

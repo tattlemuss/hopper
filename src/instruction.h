@@ -368,29 +368,21 @@ enum class Suffix
 };
 
 // ----------------------------------------------------------------------------
+// Helper functions to convert parts of the instruction to strings.
+extern const char* get_opcode_string(Opcode opcode);
+extern const char* get_index_register_string(IndexRegister reg);
+extern const char* get_control_register_string(ControlRegister reg);
+extern const char* get_suffix_string(Suffix suffix);
+// Convert from MOVEM register number to a string
+extern const char* get_movem_reg_string(int movem_reg);
+extern const char* get_scale_shift_string(int scale);
+
+// ----------------------------------------------------------------------------
 // A decoded instruction split into its constituent parts.
 struct instruction
 {
-	instruction() :
-		header(0U),
-		byte_count(0U),
-		opcode(Opcode::NONE),
-		suffix(Suffix::BYTE)
-	{
-	}
-
-	void reset()
-	{
-		// This effectively sets the instruction to a "dc.w" statement
-		byte_count = 2U;
-		opcode = Opcode::NONE;
-		suffix = Suffix::NONE;
-		op0.type = OpType::INVALID;
-		op1.type = OpType::INVALID;
-		op2.type = OpType::INVALID;
-		bf0.valid = 0;
-		bf1.valid = 0;
-	}
+	instruction();
+	void reset();
 
 	uint32_t	address;
 	uint16_t	header;			// first 16-bit word of data
