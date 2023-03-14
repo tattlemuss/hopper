@@ -49,6 +49,7 @@ const char* g_opcode_names[Opcode::COUNT] =
 	"chk2",
 	"clr",
 	"cmp",
+	"cmp2",
 	"cmpi",
 	"cmpa",
 	"cmpm",

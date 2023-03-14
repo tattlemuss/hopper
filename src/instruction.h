@@ -55,6 +55,7 @@ enum Opcode
 	CHK2,
 	CLR,
 	CMP,
+	CMP2,
 	CMPI,
 	CMPA,
 	CMPM,

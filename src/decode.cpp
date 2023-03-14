@@ -1507,7 +1507,7 @@ int Inst_chk(buffer_reader& buffer, const decode_settings& dsettings, instructio
 }
 
 // ----------------------------------------------------------------------------
-int Inst_chk2(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+int Inst_chk2_cmp2(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
 {
 	uint8_t size = (header >> 9) & 3;
 	uint8_t mode = (header >> 3) & 7;
@@ -1521,8 +1521,9 @@ int Inst_chk2(buffer_reader& buffer, const decode_settings& dsettings, instructi
 	if (buffer.read_word(val16))
 		return 1;
 
-	if (((val16 >> 11) & 1) != 1)
-		return 1;
+	// Final opcode depends on a bit in the second word!
+	uint8_t opcode = (val16 >> 11) & 1;
+	inst.opcode = opcode ? Opcode::CHK2 : Opcode::CMP2;
 
 	set_d_or_a_reg(inst.op1, (val16 >> 15) & 1, (val16 >> 12) & 7);
 	return decode_ea(buffer, dsettings, inst.op0, ea_group::CONTROL, mode, reg, ea_size, inst.address);
@@ -1641,7 +1642,7 @@ const matcher_entry g_matcher_table_0000[] =
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b111001,	CPU_MIN_68000, MOVEP,		Inst_movep_reg_mem ),
 	MATCH_ENTRY2_IMPL(11,5,0b00001,6,3,0b011,		CPU_MIN_68020, CAS,			Inst_cas ),
 	MATCH_ENTRY1_IMPL(6,10,0b0000011011,			CPU_68020,     CALLM,		Inst_callm ),
-	MATCH_ENTRY2_IMPL(11,5,0b00000,6,3,0b011,		CPU_MIN_68020, CHK2,		Inst_chk2 ),	// aliases CALLM
+	MATCH_ENTRY2_IMPL(11,5,0b00000,6,3,0b011,		CPU_MIN_68020, CHK2,		Inst_chk2_cmp2 ),	// aliases CALLM
 	MATCH_ENTRY1_IMPL(6,10,0b0000100001,			CPU_MIN_68000, BCHG,		Inst_bchg_imm ),
 	MATCH_ENTRY1_IMPL(6,10,0b0000100010,			CPU_MIN_68000, BCLR,		Inst_bchg_imm ),
 	MATCH_ENTRY1_IMPL(6,10,0b0000100011,			CPU_MIN_68000, BSET,		Inst_bchg_imm ),
@@ -1945,6 +1946,9 @@ void decode(buffer_reader& buffer, const decode_settings& dsettings, instruction
 			continue;
 
 		// Do specialised decoding
+		// Set the opcode early, so the function can override.
+		// This is used in some esoteric 68020+ instructions (e.g CHK2), where a bit in the
+		// successive word decides the final opcode.
 		inst.opcode = pEntry->opcode;
 		int res = 0;
 		if (pEntry->func)
