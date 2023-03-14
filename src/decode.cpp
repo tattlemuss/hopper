@@ -1497,7 +1497,7 @@ int Inst_chk(buffer_reader& buffer, const decode_settings& dsettings, instructio
 	uint8_t reg  = (header >> 0) & 7;
 	Size ea_size = size ? Size::WORD : Size::LONG;
 	// Long size only allowed on 68020+
-	if (ea_size == Size::LONG)
+	if (ea_size == Size::LONG && dsettings.cpu_type < CPU_TYPE_68020)
 		return 1;
 
 	inst.suffix = size_to_suffix(ea_size);
@@ -1701,7 +1701,7 @@ const matcher_entry g_matcher_table_0100[] =
 	MATCH_ENTRY1_IMPL(8,8,0b01001010,				CPU_MIN_68000, TST,			Inst_size_ea ),
 	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b111,		CPU_MIN_68000, LEA,			Inst_lea ),
 	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b110,		CPU_MIN_68000, CHK,			Inst_chk ),
-	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b100,		CPU_MIN_68000, CHK,			Inst_chk ),	// not 68000
+	MATCH_ENTRY2_IMPL(12,4,0b0100, 6,3,0b100,		CPU_MIN_68000, CHK,			Inst_chk ),
 	MATCH_END
 };
 

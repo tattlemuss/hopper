@@ -78,3 +78,4 @@ L2:
 	cas.l	d0,d7,-(a7)
 
 	cas2.w	d6:d1,d2:d3,(a5):(d4)
+	chk.l	127(a0,d1.l*8),d7
