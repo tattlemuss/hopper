@@ -52,6 +52,7 @@ enum Opcode
 	CAS,
 	CAS2,
 	CHK,
+	CHK2,
 	CLR,
 	CMP,
 	CMPI,

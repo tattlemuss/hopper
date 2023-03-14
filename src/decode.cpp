@@ -1507,6 +1507,28 @@ int Inst_chk(buffer_reader& buffer, const decode_settings& dsettings, instructio
 }
 
 // ----------------------------------------------------------------------------
+int Inst_chk2(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+{
+	uint8_t size = (header >> 9) & 3;
+	uint8_t mode = (header >> 3) & 7;
+	uint8_t reg  = (header >> 0) & 7;
+	Size ea_size = standard_size_table[size];
+	if (ea_size == Size::NONE)
+		return 1;
+	inst.suffix = size_to_suffix(ea_size);
+
+	uint16_t val16;
+	if (buffer.read_word(val16))
+		return 1;
+
+	if (((val16 >> 11) & 1) != 1)
+		return 1;
+
+	set_d_or_a_reg(inst.op1, (val16 >> 15) & 1, (val16 >> 12) & 7);
+	return decode_ea(buffer, dsettings, inst.op0, ea_group::CONTROL, mode, reg, ea_size, inst.address);
+}
+
+// ----------------------------------------------------------------------------
 int Inst_exg_dd(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t regx = (header >> 9) & 7;
@@ -1617,8 +1639,9 @@ const matcher_entry g_matcher_table_0000[] =
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b101001,	CPU_MIN_68000, MOVEP,		Inst_movep_mem_reg ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b110001,	CPU_MIN_68000, MOVEP,		Inst_movep_reg_mem ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b111001,	CPU_MIN_68000, MOVEP,		Inst_movep_reg_mem ),
-	MATCH_ENTRY2_IMPL(11,5,0b00001, 6,3,0b011,		CPU_MIN_68020, CAS,			Inst_cas ),
+	MATCH_ENTRY2_IMPL(11,5,0b00001,6,3,0b011,		CPU_MIN_68020, CAS,			Inst_cas ),
 	MATCH_ENTRY1_IMPL(6,10,0b0000011011,			CPU_68020,     CALLM,		Inst_callm ),
+	MATCH_ENTRY2_IMPL(11,5,0b00000,6,3,0b011,		CPU_MIN_68020, CHK2,		Inst_chk2 ),	// aliases CALLM
 	MATCH_ENTRY1_IMPL(6,10,0b0000100001,			CPU_MIN_68000, BCHG,		Inst_bchg_imm ),
 	MATCH_ENTRY1_IMPL(6,10,0b0000100010,			CPU_MIN_68000, BCLR,		Inst_bchg_imm ),
 	MATCH_ENTRY1_IMPL(6,10,0b0000100011,			CPU_MIN_68000, BSET,		Inst_bchg_imm ),
