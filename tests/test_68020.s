@@ -83,4 +83,14 @@ L2:
 	chk2.b	$12345678.l,d7
 	chk2.l	$5678.w,a3
 	cmp2.b	$5678.w,a3
-	
+
+	divs.l	3(a0),d0
+	divs.l	3(a0),d0:d1
+	divs.l	L2(pc),d1:d0
+	divs.l	L2(pc),d0
+	divsl.l	L2(pc),d7:d6
+	divu.l	3(a0),d0
+	divu.l	3(a0),d0:d1
+	divu.l	L2(pc),d1:d0
+	divu.l	L2(pc),d0
+	divul.l	L2(pc),d7:d6

@@ -61,6 +61,13 @@ static void set_d_or_a_reg(operand& op, uint8_t d_or_a, uint8_t reg)
 		set_dreg(op, reg);
 }
 
+static void set_dreg_pair(operand& op, uint8_t reg1, uint8_t reg2)
+{
+	op.type = OpType::D_REGISTER_PAIR;
+	op.d_register_pair.dreg1 = reg1;
+	op.d_register_pair.dreg2 = reg2;
+}
+
 static void set_predec(operand& op, uint8_t reg)
 {
 	op.type = OpType::INDIRECT_PREDEC;
@@ -916,12 +923,8 @@ int Inst_cas2(buffer_reader& buffer, const decode_settings& dsettings, instructi
 		return 1;
 
 	inst.suffix = size_to_suffix(ea_size);
-	inst.op0.type = D_REGISTER_PAIR;
-	inst.op0.d_register_pair.dreg1 = (val1 >> 0) & 7;
-	inst.op0.d_register_pair.dreg2 = (val2 >> 0) & 7;
-	inst.op1.type = D_REGISTER_PAIR;
-	inst.op1.d_register_pair.dreg1 = (val1 >> 6) & 7;
-	inst.op1.d_register_pair.dreg2 = (val2 >> 6) & 7;
+	set_dreg_pair(inst.op0, (val1 >> 0) & 7, (val2 >> 0) & 7);
+	set_dreg_pair(inst.op1, (val1 >> 6) & 7, (val2 >> 6) & 7);
 
 	inst.op2.type = INDIRECT_REGISTER_PAIR;
 	inst.op2.indirect_register_pair.reg1 = calc_index_register((val1 >> 15) & 1, (val1 >> 12) & 7);
@@ -1489,6 +1492,54 @@ int Inst_muldiv(buffer_reader& buffer, const decode_settings& dsettings, instruc
 }
 
 // ----------------------------------------------------------------------------
+int Inst_divl(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+{
+	uint8_t mode = (header >> 3) & 7;
+	uint8_t reg  = (header >> 0) & 7;
+	Size ea_size = Size::LONG;
+	inst.suffix = Suffix::LONG;
+
+	uint16_t val16;
+	if (buffer.read_word(val16))
+		return 1;
+
+	// TODO opcode based on bits
+	uint8_t reg_dq  = (val16 >> 12) & 7;
+	uint8_t reg_dr  = (val16 >> 0) & 7;
+	uint8_t size = (val16 >> 10) & 1;
+	uint8_t is_signed = (val16 >> 11) & 1;
+
+	// NOTE: PRM says data-alt, but this looks not correct
+	if (decode_ea(buffer, dsettings, inst.op0, ea_group::DATA, mode, reg, ea_size, inst.address))
+		return 1;
+
+	inst.opcode = is_signed ? Opcode::DIVS : Opcode::DIVU;
+	if (size)
+	{
+		// 64-bit variant:
+		// DIVS.L < ea > ,Dr:Dq       64/32 -> 32r – 32q
+		set_dreg_pair(inst.op1, reg_dr, reg_dq);
+	}
+	else
+	{
+		// 32-bit variant:
+		// DIVSL.L < ea > ,Dr:Dq      32/32 -> 32r – 32q
+		// OR
+		// DIVS.L < ea > ,Dq		  32/32 -> 32q
+		if (reg_dq == reg_dr)
+		{
+			set_dreg(inst.op1, reg_dq);
+		}
+		else
+		{
+			inst.opcode = is_signed ? Opcode::DIVSL : Opcode::DIVUL;
+			set_dreg_pair(inst.op1, reg_dr, reg_dq);
+		}
+	}
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
 int Inst_chk(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
 {
 	uint8_t dreg = (header >> 9) & 7;
@@ -1716,6 +1767,8 @@ const matcher_entry g_matcher_table_0100[] =
 	MATCH_ENTRY1_IMPL(6,10,0b0100101011,			CPU_MIN_68000, TAS,			Inst_tas ),
 	MATCH_ENTRY1_IMPL(6,10,0b0100111010,			CPU_MIN_68000, JSR,			Inst_jump ),
 	MATCH_ENTRY1_IMPL(6,10,0b0100111011,			CPU_MIN_68000, JMP,			Inst_jump ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100110001,			CPU_MIN_68000, DIVS,		Inst_divl ),
+
 	MATCH_ENTRY1_IMPL(7,9,0b010010001,				CPU_MIN_68000, MOVEM,		Inst_movem_reg_mem ), // Register to memory.
 	MATCH_ENTRY1_IMPL(7,9,0b010011001,				CPU_MIN_68000, MOVEM,		Inst_movem_mem_reg ), // Memory to register.
 	MATCH_ENTRY1_IMPL(8,8,0b01000000,				CPU_MIN_68000, NEGX,		Inst_size_ea ),
