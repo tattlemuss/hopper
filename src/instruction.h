@@ -82,6 +82,7 @@ enum Opcode
 	EORI,
 	EXG,
 	EXT,
+	EXTB,
 	ILLEGAL,
 	JMP,
 	JSR,

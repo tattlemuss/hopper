@@ -76,6 +76,7 @@ const char* g_opcode_names[Opcode::COUNT] =
 	"eori",
 	"exg",
 	"ext",
+	"extb",
 	"illegal",
 	"jmp",
 	"jsr",

@@ -94,3 +94,4 @@ L2:
 	divu.l	L2(pc),d1:d0
 	divu.l	L2(pc),d0
 	divul.l	L2(pc),d7:d6
+	extb.l	d5

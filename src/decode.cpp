@@ -1274,11 +1274,24 @@ int Inst_branch(buffer_reader& buffer, const decode_settings& dsettings, instruc
 }
 
 // ----------------------------------------------------------------------------
-int Inst_ext(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+int Inst_ext(buffer_reader& /*header*/, const decode_settings& dsettings, instruction& inst, uint32_t header)
 {
 	// NOTE: this needs to be changed if handling ext byte->long
-	uint8_t mode = (header >> 6) & 1;
-	inst.suffix = (mode == 0) ? Suffix::WORD : Suffix::LONG;
+	uint8_t mode = (header >> 6) & 7;
+	switch (mode)
+	{
+		case 2:
+			inst.suffix = Suffix::WORD; break;
+		case 3:
+			inst.suffix = Suffix::LONG; break;
+		case 7:
+			if (dsettings.cpu_type < CPU_TYPE_68020)
+				return 1;
+			inst.suffix = Suffix::LONG;	break;
+		default:
+			return 1;
+	}
+
 	uint8_t reg = (header >> 0) & 7;
 	set_dreg(inst.op0, reg);
 	return 0;
@@ -1755,7 +1768,8 @@ const matcher_entry g_matcher_table_0100[] =
 	MATCH_ENTRY1_IMPL(3,13,0b0100111001101,			CPU_MIN_68000, MOVE,		Inst_move_from_usp ),
 	MATCH_ENTRY1_IMPL(3,13,0b0100100010000,			CPU_MIN_68000, EXT,			Inst_ext ),
 	MATCH_ENTRY1_IMPL(3,13,0b0100100011000,			CPU_MIN_68000, EXT,			Inst_ext ),
-	//([ ( 3,13, 0b0100100011000)			  ,		CPU_MIN_68000, "EXTB.L",	Inst_ext ),	 # not on 68000
+	MATCH_ENTRY1_IMPL(3,13,0b0100100111000,			CPU_MIN_68020, EXTB,		Inst_ext ),
+
 	MATCH_ENTRY1_IMPL(4,12,0b010011100100,			CPU_MIN_68000, TRAP,		Inst_trap ),
 	MATCH_ENTRY1_IMPL(6,10,0b0100000011,			CPU_MIN_68000, MOVE,		Inst_move_from_sr ),   // supervisor on 68010+
 	MATCH_ENTRY1_IMPL(6,10,0b0100011011,			CPU_MIN_68000, MOVE,		Inst_move_to_sr ),   // supervisor
