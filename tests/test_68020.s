@@ -95,3 +95,4 @@ L2:
 	divu.l	L2(pc),d0
 	divul.l	L2(pc),d7:d6
 	extb.l	d5
+	link.l	a3,#-$12345678

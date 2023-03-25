@@ -41,6 +41,14 @@ static void set_imm_long(operand& op, uint32_t val)
 	op.imm.is_signed = false;
 }
 
+static void set_imm_long_signed(operand& op, int32_t val)
+{
+	op.type = OpType::IMMEDIATE;
+	op.imm.size = Size::LONG;
+	op.imm.val0 = val;
+	op.imm.is_signed = true;
+}
+
 static void set_dreg(operand& op, uint8_t reg)
 {
 	op.type = OpType::D_DIRECT;
@@ -1101,6 +1109,20 @@ int Inst_link_w(buffer_reader& buffer, const decode_settings& dsettings, instruc
 }
 
 // ----------------------------------------------------------------------------
+int Inst_link_l(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+{
+	uint8_t reg = (header >> 0) & 7;
+	inst.suffix = Suffix::LONG;
+	set_areg(inst.op0, reg);
+	uint32_t disp;
+	if (buffer.read_long(disp))
+		return 1;
+
+	set_imm_long_signed(inst.op1, (int32_t)disp);
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
 int Inst_unlk(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t reg = (header >> 0) & 7;
@@ -1762,7 +1784,7 @@ const matcher_entry g_matcher_table_0100[] =
 	MATCH_ENTRY1_IMPL(3,13,0b0100100001001,			CPU_MIN_68010, BKPT,		Inst_bkpt ),
 	MATCH_ENTRY1_IMPL(3,13,0b0100100001000,			CPU_MIN_68000, SWAP,		Inst_swap ),
 	MATCH_ENTRY1_IMPL(3,13,0b0100111001010,			CPU_MIN_68000, LINK,		Inst_link_w ),
-	//([ ( 3,13, 0b0100100000001)			  ,		CPU_MIN_68000, "LINK.L",	Inst_link_l ),  # not on 68000
+	MATCH_ENTRY1_IMPL(3,13,0b0100100000001,			CPU_MIN_68020, LINK,		Inst_link_l ),
 	MATCH_ENTRY1_IMPL(3,13,0b0100111001011,			CPU_MIN_68000, UNLK,		Inst_unlk ),
 	MATCH_ENTRY1_IMPL(3,13,0b0100111001100,			CPU_MIN_68000, MOVE,		Inst_move_to_usp ),
 	MATCH_ENTRY1_IMPL(3,13,0b0100111001101,			CPU_MIN_68000, MOVE,		Inst_move_from_usp ),
