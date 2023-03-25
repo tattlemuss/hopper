@@ -1767,7 +1767,7 @@ const matcher_entry g_matcher_table_0100[] =
 	MATCH_ENTRY1_IMPL(6,10,0b0100101011,			CPU_MIN_68000, TAS,			Inst_tas ),
 	MATCH_ENTRY1_IMPL(6,10,0b0100111010,			CPU_MIN_68000, JSR,			Inst_jump ),
 	MATCH_ENTRY1_IMPL(6,10,0b0100111011,			CPU_MIN_68000, JMP,			Inst_jump ),
-	MATCH_ENTRY1_IMPL(6,10,0b0100110001,			CPU_MIN_68000, DIVS,		Inst_divl ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100110001,			CPU_MIN_68020, DIVS,		Inst_divl ),
 
 	MATCH_ENTRY1_IMPL(7,9,0b010010001,				CPU_MIN_68000, MOVEM,		Inst_movem_reg_mem ), // Register to memory.
 	MATCH_ENTRY1_IMPL(7,9,0b010011001,				CPU_MIN_68000, MOVEM,		Inst_movem_mem_reg ), // Memory to register.
