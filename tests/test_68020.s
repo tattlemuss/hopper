@@ -96,3 +96,13 @@ L2:
 	divul.l	L2(pc),d7:d6
 	extb.l	d5
 	link.l	a3,#-$12345678
+
+	muls.l	3(a0),d0
+	muls.l	3(a0),d0:d1
+	muls.l	L2(pc),d1:d0
+	muls.l	L2(pc),d0
+	mulu.l	3(a0),d0
+	mulu.l	3(a0),d0:d1
+	mulu.l	L2(pc),d1:d0
+	mulu.l	L2(pc),d0
+

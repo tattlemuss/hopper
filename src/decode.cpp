@@ -1538,7 +1538,6 @@ int Inst_divl(buffer_reader& buffer, const decode_settings& dsettings, instructi
 	if (buffer.read_word(val16))
 		return 1;
 
-	// TODO opcode based on bits
 	uint8_t reg_dq  = (val16 >> 12) & 7;
 	uint8_t reg_dr  = (val16 >> 0) & 7;
 	uint8_t size = (val16 >> 10) & 1;
@@ -1570,6 +1569,43 @@ int Inst_divl(buffer_reader& buffer, const decode_settings& dsettings, instructi
 			inst.opcode = is_signed ? Opcode::DIVSL : Opcode::DIVUL;
 			set_dreg_pair(inst.op1, reg_dr, reg_dq);
 		}
+	}
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
+int Inst_mull(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+{
+	uint8_t mode = (header >> 3) & 7;
+	uint8_t reg  = (header >> 0) & 7;
+	Size ea_size = Size::LONG;
+	inst.suffix = Suffix::LONG;
+
+	uint16_t val16;
+	if (buffer.read_word(val16))
+		return 1;
+
+	uint8_t reg_dl  = (val16 >> 12) & 7;
+	uint8_t reg_dh  = (val16 >> 0) & 7;
+	uint8_t size = (val16 >> 10) & 1;
+	uint8_t is_signed = (val16 >> 11) & 1;
+
+	// NOTE: PRM says data-alt, but this looks not correct
+	if (decode_ea(buffer, dsettings, inst.op0, ea_group::DATA, mode, reg, ea_size, inst.address))
+		return 1;
+
+	inst.opcode = is_signed ? Opcode::MULS : Opcode::MULU;
+	if (size)
+	{
+		// 64-bit variant:
+		// MULS.L < ea > ,Dh – Dl 32 x 32 -> 64
+		set_dreg_pair(inst.op1, reg_dh, reg_dl);
+	}
+	else
+	{
+		// 32-bit variant:
+		// MULS.L < ea > ,Dl  32 x 32 -> 32
+		set_dreg(inst.op1, reg_dl);
 	}
 	return 0;
 }
@@ -1804,6 +1840,7 @@ const matcher_entry g_matcher_table_0100[] =
 	MATCH_ENTRY1_IMPL(6,10,0b0100111010,			CPU_MIN_68000, JSR,			Inst_jump ),
 	MATCH_ENTRY1_IMPL(6,10,0b0100111011,			CPU_MIN_68000, JMP,			Inst_jump ),
 	MATCH_ENTRY1_IMPL(6,10,0b0100110001,			CPU_MIN_68020, DIVS,		Inst_divl ),
+	MATCH_ENTRY1_IMPL(6,10,0b0100110000,			CPU_MIN_68020, MULS,		Inst_mull ),
 
 	MATCH_ENTRY1_IMPL(7,9,0b010010001,				CPU_MIN_68000, MOVEM,		Inst_movem_reg_mem ), // Register to memory.
 	MATCH_ENTRY1_IMPL(7,9,0b010011001,				CPU_MIN_68000, MOVEM,		Inst_movem_mem_reg ), // Memory to register.
