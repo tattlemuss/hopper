@@ -57,7 +57,6 @@ L1:
 	moves.w -(a5),d3
 	moves.w ([$100,a0],d1.w),d0
 	moves.w a5,([$100,a0,a3.w*4])
-
 	bfchg	(a0){15:3}
 	bfchg	2043(a0){30:d3}
 	bfclr	L2{d0:d7}
@@ -72,18 +71,14 @@ L2:
 	bsr.l	L1
 	callm	#$ff,0(a6,d0.w*8)
 	callm	#$34,L2(pc)
-
 	cas.b	d1,d3,(a7)
 	cas.w	d1,d3,(a7)
 	cas.l	d0,d7,-(a7)
-
 	cas2.w	d6:d1,d2:d3,(a5):(d4)
 	chk.l	127(a0,d1.l*8),d7
-
 	chk2.b	$12345678.l,d7
 	chk2.l	$5678.w,a3
 	cmp2.b	$5678.w,a3
-
 	divs.l	3(a0),d0
 	divs.l	3(a0),d0:d1
 	divs.l	L2(pc),d1:d0
@@ -96,7 +91,6 @@ L2:
 	divul.l	L2(pc),d7:d6
 	extb.l	d5
 	link.l	a3,#-$12345678
-
 	muls.l	3(a0),d0
 	muls.l	3(a0),d0:d1
 	muls.l	L2(pc),d1:d0
@@ -105,4 +99,6 @@ L2:
 	mulu.l	3(a0),d0:d1
 	mulu.l	L2(pc),d1:d0
 	mulu.l	L2(pc),d0
+	pack	-(a1),-(a7),#$1234
+	pack	d7,d1,#$8765
 

@@ -106,6 +106,7 @@ enum Opcode
 	NOT,
 	OR,
 	ORI,
+	PACK,
 	PEA,
 	RESET,
 	ROL,

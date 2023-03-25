@@ -1078,7 +1078,7 @@ int Inst_simple(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/,
 }
 
 // ----------------------------------------------------------------------------
-int Inst_swap(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+int Inst_swap(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t reg = (header >> 0) & 7;
 	set_dreg(inst.op0, reg);
@@ -1086,7 +1086,7 @@ int Inst_swap(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, i
 }
 
 // ----------------------------------------------------------------------------
-int Inst_bkpt(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+int Inst_bkpt(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t vec = (header >> 0) & 7;
 	set_imm_byte(inst.op0, vec);
@@ -1123,7 +1123,7 @@ int Inst_link_l(buffer_reader& buffer, const decode_settings& dsettings, instruc
 }
 
 // ----------------------------------------------------------------------------
-int Inst_unlk(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+int Inst_unlk(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t reg = (header >> 0) & 7;
 	set_areg(inst.op0, reg);
@@ -1131,7 +1131,7 @@ int Inst_unlk(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, i
 }
 
 // ----------------------------------------------------------------------------
-int Inst_move_from_usp(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+int Inst_move_from_usp(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t reg = (header >> 0) & 7;
 	inst.op0.type = OpType::USP;
@@ -1140,7 +1140,7 @@ int Inst_move_from_usp(buffer_reader& /*header*/, const decode_settings& /*dsett
 }
 
 // ----------------------------------------------------------------------------
-int Inst_move_to_usp(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+int Inst_move_to_usp(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t reg = (header >> 0) & 7;
 	set_areg(inst.op0, reg);
@@ -1296,7 +1296,7 @@ int Inst_branch(buffer_reader& buffer, const decode_settings& dsettings, instruc
 }
 
 // ----------------------------------------------------------------------------
-int Inst_ext(buffer_reader& /*header*/, const decode_settings& dsettings, instruction& inst, uint32_t header)
+int Inst_ext(buffer_reader& /*buffer*/, const decode_settings& dsettings, instruction& inst, uint32_t header)
 {
 	// NOTE: this needs to be changed if handling ext byte->long
 	uint8_t mode = (header >> 6) & 7;
@@ -1382,7 +1382,7 @@ int Inst_scc(buffer_reader& buffer, const decode_settings& dsettings, instructio
 }
 
 // ----------------------------------------------------------------------------
-int Inst_sbcd_reg(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+int Inst_sbcd_reg(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t regx = (header >> 0) & 7;
 	uint8_t regy = (header >> 9) & 7;
@@ -1392,7 +1392,7 @@ int Inst_sbcd_reg(buffer_reader& /*header*/, const decode_settings& /*dsettings*
 }
 
 // ----------------------------------------------------------------------------
-int Inst_sbcd_predec(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+int Inst_sbcd_predec(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t regx = (header >> 0) & 7;
 	uint8_t regy = (header >> 9) & 7;
@@ -1402,7 +1402,35 @@ int Inst_sbcd_predec(buffer_reader& /*header*/, const decode_settings& /*dsettin
 }
 
 // ----------------------------------------------------------------------------
-int Inst_subx_reg(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+int Inst_pack_reg(buffer_reader& buffer, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+{
+	uint8_t regx = (header >> 0) & 7;
+	uint8_t regy = (header >> 9) & 7;
+	set_dreg(inst.op0, regx);
+	set_dreg(inst.op1, regy);
+	uint16_t val16;
+	if (buffer.read_word(val16))
+		return 1;
+	set_imm_word(inst.op2, val16);
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
+int Inst_pack_predec(buffer_reader& buffer, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+{
+	uint8_t regx = (header >> 0) & 7;
+	uint8_t regy = (header >> 9) & 7;
+	set_predec(inst.op0, regx);
+	set_predec(inst.op1, regy);
+	uint16_t val16;
+	if (buffer.read_word(val16))
+		return 1;
+	set_imm_word(inst.op2, val16);
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
+int Inst_subx_reg(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t size = (header >> 6) & 3;
 	Size ea_size = standard_size_table[size];
@@ -1417,7 +1445,7 @@ int Inst_subx_reg(buffer_reader& /*header*/, const decode_settings& /*dsettings*
 }
 
 // ----------------------------------------------------------------------------
-int Inst_subx_predec(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+int Inst_subx_predec(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t size = (header >> 6) & 3;
 	Size ea_size = standard_size_table[size];
@@ -1433,7 +1461,7 @@ int Inst_subx_predec(buffer_reader& /*header*/, const decode_settings& /*dsettin
 }
 
 // ----------------------------------------------------------------------------
-int Inst_cmpm(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+int Inst_cmpm(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t size = (header >> 6) & 3;
 	Size ea_size = standard_size_table[size];
@@ -1652,7 +1680,7 @@ int Inst_chk2_cmp2(buffer_reader& buffer, const decode_settings& dsettings, inst
 }
 
 // ----------------------------------------------------------------------------
-int Inst_exg_dd(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+int Inst_exg_dd(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t regx = (header >> 9) & 7;
 	uint8_t regy = (header >> 0) & 7;
@@ -1662,7 +1690,7 @@ int Inst_exg_dd(buffer_reader& /*header*/, const decode_settings& /*dsettings*/,
 }
 
 // ----------------------------------------------------------------------------
-int Inst_exg_aa(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+int Inst_exg_aa(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t regx = (header >> 9) & 7;
 	uint8_t regy = (header >> 0) & 7;
@@ -1672,7 +1700,7 @@ int Inst_exg_aa(buffer_reader& /*header*/, const decode_settings& /*dsettings*/,
 }
 
 // ----------------------------------------------------------------------------
-int Inst_exg_da(buffer_reader& /*header*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
+int Inst_exg_da(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t regx = (header >> 9) & 7;
 	uint8_t regy = (header >> 0) & 7;
@@ -1926,6 +1954,8 @@ const matcher_entry g_matcher_table_1000[] =
 {
 	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b100000,	CPU_MIN_68000, SBCD,		Inst_sbcd_reg ),
 	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b100001,	CPU_MIN_68000, SBCD,		Inst_sbcd_predec ),
+	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b101000,	CPU_MIN_68020, PACK,		Inst_pack_reg ),
+	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b101001,	CPU_MIN_68020, PACK,		Inst_pack_predec ),
 	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b011,		CPU_MIN_68000, DIVU,		Inst_muldiv ),
 	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b111,		CPU_MIN_68000, DIVS,		Inst_muldiv ),
 	MATCH_ENTRY1_IMPL(12,4,0b1000,					CPU_MIN_68000, OR,			Inst_alu_dreg ),
