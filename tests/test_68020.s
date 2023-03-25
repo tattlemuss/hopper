@@ -101,4 +101,5 @@ L2:
 	mulu.l	L2(pc),d0
 	pack	-(a1),-(a7),#$1234
 	pack	d7,d1,#$8765
-
+	rtm	a6
+	rtm	d1

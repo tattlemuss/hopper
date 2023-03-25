@@ -115,6 +115,7 @@ enum Opcode
 	ROXR,
 	RTD,
 	RTE,
+	RTM,
 	RTR,
 	RTS,
 	SBCD,

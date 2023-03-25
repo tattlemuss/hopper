@@ -109,6 +109,7 @@ const char* g_opcode_names[Opcode::COUNT] =
 	"roxr",
 	"rtd",
 	"rte",
+	"rtm",
 	"rtr",
 	"rts",
 	"sbcd",

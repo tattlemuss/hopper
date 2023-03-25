@@ -1736,6 +1736,13 @@ int Inst_imm_sr(buffer_reader& buffer, const decode_settings& dsettings, instruc
 }
 
 // ----------------------------------------------------------------------------
+int Inst_rtm(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+{
+	set_d_or_a_reg(inst.op0, (header >> 3) & 1, (header >> 0) & 7);
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
 typedef int (*pfnDecoderFunc)(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header);
 
 // ===========================================================
@@ -1785,6 +1792,8 @@ const matcher_entry g_matcher_table_0000[] =
 	MATCH_ENTRY1_IMPL(0,16,0b0000000000111100,		CPU_MIN_68000, ORI,			Inst_imm_ccr ),
 	MATCH_ENTRY1_IMPL(0,16,0b0000000001111100,		CPU_MIN_68000, ORI,			Inst_imm_sr ), // supervisor
 	MATCH_ENTRY1_IMPL(0,16,0b0000001001111100,		CPU_MIN_68000, ANDI,		Inst_imm_sr ), // supervisor
+	MATCH_ENTRY1_IMPL(4,12,0b000001101100,			CPU_68020,	   RTM,			Inst_rtm ),
+
 	MATCH_ENTRY2_IMPL(11,5,0b00001,0,9,0b011111100,	CPU_MIN_68020, CAS2,		Inst_cas2 ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b100001,	CPU_MIN_68000, MOVEP,		Inst_movep_mem_reg ),
 	MATCH_ENTRY2_IMPL(12,4,0b0000, 3,6,0b101001,	CPU_MIN_68000, MOVEP,		Inst_movep_mem_reg ),
