@@ -45,12 +45,12 @@
 	asr.w	-(a2)
 	bchg.b	#$3,(a7)
 L0:
-	movem.l	d0-d6,-(a7)
+	movem.l	d0/d1/d2/d3/d4/d5/d6,-(a7)
 	movem.l	d0/d2/d4/a0/a2/a5,-(a7)
 	movem.l	d0/d2/d4/a0/a2/a5,$ffff8800.w
-	movem.l	(a7)+,d0-d6
-	movem.w	d0-d7/a0-a5,-(a7)
-	movem.w	(a7)+,d1-d7/a0-a5
+	movem.l	(a7)+,d0/d1/d2/d3/d4/d5/d6
+	movem.w	d0/d1/d2/d3/d4/d5/d6/d7/a0/a1/a2/a3/a4/a5,-(a7)
+	movem.w	(a7)+,d0/d1/d2/d3/d4/d5/d6/d7/a0/a1/a2/a3/a4/a5
 	ori.b	#$12,(a7)
 	ori.w	#$1234,(a7)
 	ori.l	#$12345678,(a7)
@@ -196,5 +196,7 @@ L1:
 	roxr.w	0(a0,d0.w)
 	roxl.w	$1234.l
 	
-L2:	dc.w	0
-L3:	dc.w	0
+L2:
+	nop
+L3:
+	nop

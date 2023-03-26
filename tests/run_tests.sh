@@ -18,8 +18,10 @@ echo "test 68020"
 echo "test 68030"
 ../src/bin/hopper --m68030  test_68030.prg > test_68030.txt
 echo "diffs"
-diff --ignore-all-space test_68000.s test_68000.txt > test_68000.diff
-diff --ignore-all-space test_68020.s test_68020.txt > test_68020.diff
-diff --ignore-all-space test_68030.s test_68030.txt > test_68030.diff
+DIFF_OPTS="--ignore-blank-lines --ignore-all-space"
+
+diff $DIFF_OPTS test_68000.s test_68000.txt > test_68000.diff
+diff $DIFF_OPTS test_68030.s test_68030.txt > test_68030.diff
+diff $DIFF_OPTS test_68020.s test_68020.txt > test_68020.diff
 
 
