@@ -16,10 +16,9 @@ struct time_entry
 
 static const time_entry g_timingEntry[] = 
 {
-	//		inst			suff	op0			op1					cycles
 #include "timing_table.i"
 
-	{ Opcode::COUNT}
+	{ Opcode::COUNT, Suffix::NONE, OpType::INVALID, OpType::INVALID, 0, 0, 0}
 };
 
 // Special case: move instructions are effectively a 2d sum

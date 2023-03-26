@@ -915,7 +915,7 @@ int Inst_cas(buffer_reader& buffer, const decode_settings& dsettings, instructio
 }
 
 // ----------------------------------------------------------------------------
-int Inst_cas2(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+int Inst_cas2(buffer_reader& buffer, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t size = (header >> 9) & 3;
 	// Byte size is not allowed
@@ -1023,7 +1023,7 @@ int Inst_shift_mem(buffer_reader& /*buffer*/, const decode_settings& /*dsettings
 }
 
 // ----------------------------------------------------------------------------
-int Inst_stop(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t /*header*/)
+int Inst_stop(buffer_reader& buffer, const decode_settings& /*dsettings*/, instruction& inst, uint32_t /*header*/)
 {
 	uint16_t val;
 	if (buffer.read_word(val))
@@ -1033,7 +1033,7 @@ int Inst_stop(buffer_reader& buffer, const decode_settings& dsettings, instructi
 }
 
 // ----------------------------------------------------------------------------
-int Inst_rtd(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t /*header*/)
+int Inst_rtd(buffer_reader& buffer, const decode_settings& /*dsettings*/, instruction& inst, uint32_t /*header*/)
 {
 	uint16_t val;
 	if (buffer.read_word(val))
@@ -1094,7 +1094,7 @@ int Inst_bkpt(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/, i
 }
 
 // ----------------------------------------------------------------------------
-int Inst_link_w(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+int Inst_link_w(buffer_reader& buffer, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t reg = (header >> 0) & 7;
 	inst.suffix = Suffix::WORD;
@@ -1109,7 +1109,7 @@ int Inst_link_w(buffer_reader& buffer, const decode_settings& dsettings, instruc
 }
 
 // ----------------------------------------------------------------------------
-int Inst_link_l(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+int Inst_link_l(buffer_reader& buffer, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t reg = (header >> 0) & 7;
 	inst.suffix = Suffix::LONG;
@@ -1320,7 +1320,7 @@ int Inst_ext(buffer_reader& /*buffer*/, const decode_settings& dsettings, instru
 }
 
 // ----------------------------------------------------------------------------
-int Inst_movep_mem_reg(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+int Inst_movep_mem_reg(buffer_reader& buffer, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 6) & 1;
 	inst.suffix = (mode == 0) ? Suffix::WORD : Suffix::LONG;
@@ -1340,7 +1340,7 @@ int Inst_movep_mem_reg(buffer_reader& buffer, const decode_settings& dsettings, 
 }
 
 // ----------------------------------------------------------------------------
-int Inst_movep_reg_mem(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+int Inst_movep_reg_mem(buffer_reader& buffer, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 6) & 1;
 	inst.suffix = (mode == 0) ? Suffix::WORD : Suffix::LONG;
@@ -1359,7 +1359,7 @@ int Inst_movep_reg_mem(buffer_reader& buffer, const decode_settings& dsettings, 
 }
 
 // ----------------------------------------------------------------------------
-int Inst_dbcc(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+int Inst_dbcc(buffer_reader& buffer, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t dreg  = (header >> 0) & 7;
 	int32_t read_disp = buffer.get_address() - inst.address;
@@ -1374,7 +1374,7 @@ int Inst_dbcc(buffer_reader& buffer, const decode_settings& dsettings, instructi
 }
 
 // ----------------------------------------------------------------------------
-int Inst_trapcc(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+int Inst_trapcc(buffer_reader& buffer, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	uint8_t opmode = (header >> 0) & 7;
 	if (opmode == 2)
@@ -1736,7 +1736,7 @@ int Inst_exg_da(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/,
 }
 
 // ----------------------------------------------------------------------------
-int Inst_imm_ccr(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t /*header*/)
+int Inst_imm_ccr(buffer_reader& buffer, const decode_settings& /*dsettings*/, instruction& inst, uint32_t /*header*/)
 {
 	uint16_t val16;
 	if (buffer.read_word(val16))
@@ -1750,7 +1750,7 @@ int Inst_imm_ccr(buffer_reader& buffer, const decode_settings& dsettings, instru
 }
 
 // ----------------------------------------------------------------------------
-int Inst_imm_sr(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t /*header*/)
+int Inst_imm_sr(buffer_reader& buffer, const decode_settings& /*dsettings*/, instruction& inst, uint32_t /*header*/)
 {
 	uint16_t val16;
 	if (buffer.read_word(val16))
@@ -1762,7 +1762,7 @@ int Inst_imm_sr(buffer_reader& buffer, const decode_settings& dsettings, instruc
 }
 
 // ----------------------------------------------------------------------------
-int Inst_rtm(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+int Inst_rtm(buffer_reader& /*buffer*/, const decode_settings& /*dsettings*/, instruction& inst, uint32_t header)
 {
 	set_d_or_a_reg(inst.op0, (header >> 3) & 1, (header >> 0) & 7);
 	return 0;
@@ -2120,7 +2120,7 @@ const matcher_entry* g_matcher_tables[16] =
 };
 
 // ----------------------------------------------------------------------------
-void decode(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst)
+void decode(instruction& inst, buffer_reader& buffer, const decode_settings& dsettings)
 {
 	inst.reset();
 

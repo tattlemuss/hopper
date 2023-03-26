@@ -52,7 +52,7 @@ public:
 	std::vector<line>    lines;
 };
 
-int decode_buf(buffer_reader& buf, const decode_settings& dsettings, const symbols& symbols, disassembly& disasm)
+int decode_buf(buffer_reader& buf, const decode_settings& dsettings, disassembly& disasm)
 {
 	while (buf.get_remain() >= 2)
 	{
@@ -64,7 +64,7 @@ int decode_buf(buffer_reader& buf, const decode_settings& dsettings, const symbo
 
 		// We can ignore the return code, since it just says "this instruction is valid"
 		// rather than "something catastrophic happened"
-		decode(buf_copy, dsettings, line.inst);
+		decode(line.inst, buf_copy, dsettings);
 
 		// Handle failure
 		disasm.lines.push_back(line);
@@ -618,7 +618,7 @@ int process_tos_file(const uint8_t* pData, long size, const decode_settings& dse
 	}
 
 	disassembly disasm;
-	if (decode_buf(text_buf, dsettings, exe_symbols, disasm))
+	if (decode_buf(text_buf, dsettings, disasm))
 		return 1;
 
 	add_reference_symbols(disasm, exe_symbols);
@@ -634,7 +634,7 @@ int process_bin_file(const uint8_t* pData, long size, const decode_settings& dse
 	symbols bin_symbols;
 
 	disassembly disasm;
-	if (decode_buf(buf, dsettings, bin_symbols, disasm))
+	if (decode_buf(buf, dsettings, disasm))
 		return 1;
 
 	add_reference_symbols(disasm, bin_symbols);

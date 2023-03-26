@@ -19,6 +19,6 @@ struct decode_settings
 
 // decode a single instruction. The instruction's opcode will be set to "invalid", with a byte
 // size of 2, if no match was found.
-extern void decode(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst);
+extern void decode(instruction& inst, buffer_reader& buffer, const decode_settings& dsettings);
 
 #endif
