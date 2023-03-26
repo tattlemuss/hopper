@@ -156,7 +156,8 @@ const char* g_opcode_names[Opcode::COUNT] =
 	"trapvc",
 	"trapvs",
 	"tst",
-	"unlk"
+	"unlk",
+	"unpk"
 };
 
 // ----------------------------------------------------------------------------

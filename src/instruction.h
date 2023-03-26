@@ -163,6 +163,7 @@ enum Opcode
 	TRAPVS,
 	TST,
 	UNLK,
+	UNPK,
 
 	COUNT	// Used for array sizes
 };
