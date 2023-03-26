@@ -1374,6 +1374,32 @@ int Inst_dbcc(buffer_reader& buffer, const decode_settings& dsettings, instructi
 }
 
 // ----------------------------------------------------------------------------
+int Inst_trapcc(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+{
+	uint8_t opmode = (header >> 0) & 7;
+	if (opmode == 2)
+	{
+		uint16_t val16;
+		if (buffer.read_word(val16))
+			return 1;
+		inst.suffix = Suffix::WORD;
+		set_imm_word(inst.op0, val16);
+	}
+	else if (opmode == 3)
+	{
+		uint32_t val32;
+		if (buffer.read_long(val32))
+			return 1;
+		inst.suffix = Suffix::LONG;
+		set_imm_long(inst.op0, val32);
+	}
+	else if (opmode != 4)
+		return 1;
+
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
 int Inst_scc(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
 {
 	uint8_t mode = (header >> 3) & 7;
@@ -1911,6 +1937,21 @@ const matcher_entry g_matcher_table_0101[] =
 	MATCH_ENTRY1_IMPL(3,13,0b0101110111001,			CPU_MIN_68000, DBLT,		Inst_dbcc ),
 	MATCH_ENTRY1_IMPL(3,13,0b0101111011001,			CPU_MIN_68000, DBGT,		Inst_dbcc ),
 	MATCH_ENTRY1_IMPL(3,13,0b0101111111001,			CPU_MIN_68000, DBLE,		Inst_dbcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101000111111,			CPU_MIN_68020, TRAPF,		Inst_trapcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101001011111,			CPU_MIN_68020, TRAPHI,		Inst_trapcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101001111111,			CPU_MIN_68020, TRAPLS,		Inst_trapcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101010011111,			CPU_MIN_68020, TRAPCC,		Inst_trapcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101010111111,			CPU_MIN_68020, TRAPCS,		Inst_trapcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101011011111,			CPU_MIN_68020, TRAPNE,		Inst_trapcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101011111111,			CPU_MIN_68020, TRAPEQ,		Inst_trapcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101100011111,			CPU_MIN_68020, TRAPVC,		Inst_trapcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101100111111,			CPU_MIN_68020, TRAPVS,		Inst_trapcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101101011111,			CPU_MIN_68020, TRAPPL,		Inst_trapcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101101111111,			CPU_MIN_68020, TRAPMI,		Inst_trapcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101110011111,			CPU_MIN_68020, TRAPGE,		Inst_trapcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101110111111,			CPU_MIN_68020, TRAPLT,		Inst_trapcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101111011111,			CPU_MIN_68020, TRAPGT,		Inst_trapcc ),
+	MATCH_ENTRY1_IMPL(3,13,0b0101111111111,			CPU_MIN_68020, TRAPLE,		Inst_trapcc ),
 	MATCH_ENTRY1_IMPL(6,10,0b0101000011,			CPU_MIN_68000, ST,			Inst_scc ),
 	MATCH_ENTRY1_IMPL(6,10,0b0101000111,			CPU_MIN_68000, SF,			Inst_scc ),
 	MATCH_ENTRY1_IMPL(6,10,0b0101001011,			CPU_MIN_68000, SHI,			Inst_scc ),

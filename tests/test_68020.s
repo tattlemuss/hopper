@@ -103,3 +103,39 @@ L2:
 	pack	d7,d1,#$8765
 	rtm	a6
 	rtm	d1
+	trapf
+	traphi
+	trapls
+	trapcc
+	trapcs
+	trapne
+	trapeq
+	trapvc
+	trapvs
+	trappl
+	trapmi
+	trapge
+	traplt
+	trapgt
+	traple
+	trapf.w  #$1234
+	traphi.w #$1234
+	trapls.w #$1234
+	trapcc.w #$1234
+	trapcs.w #$1234
+	trapne.w #$1234
+	trapeq.w #$1234
+	trapvc.w #$1234
+	trapvs.w #$1234
+	trappl.w #$1234
+	trapmi.w #$1234
+	trapge.w #$1234
+	traplt.w #$1234
+	trapgt.w #$1234
+	traple.w #$1234
+	trapcc.l #$12345678
+	trapcs.l #$12345678
+	trapne.l #$12345678
+	trapeq.l #$12345678
+	trapvc.l #$12345678
+	trapvs.l #$12345678
