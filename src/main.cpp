@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <vector>
 #include <string>
+#include <cstring>
 
 #include "buffer.h"
 #include "decode.h"

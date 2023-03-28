@@ -21,6 +21,7 @@ all: $(OUT_PATH)
 
 # Final exe
 ${OUT_PATH}: ${CPP_OBJ}
+	mkdir -p bin
 	${LD} ${LDFLAGS} $^ -g -o $@
 
 clean:
