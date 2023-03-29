@@ -238,9 +238,9 @@ int read_symbols(buffer_reader& buf, const tos_header& header, symbols& symbols)
 }
 
 // ----------------------------------------------------------------------------
-int process_tos_file(const uint8_t* pData, long size, const decode_settings& dsettings, const print_settings& psettings, FILE* pOutput)
+int process_tos_file(const uint8_t* data_ptr, long size, const decode_settings& dsettings, const print_settings& psettings, FILE* pOutput)
 {
-	buffer_reader buf(pData, size, 0);
+	buffer_reader buf(data_ptr, size, 0);
 	tos_header header = {};
 
 	if (buf.read_word(header.ph_branch))
@@ -298,9 +298,9 @@ int process_tos_file(const uint8_t* pData, long size, const decode_settings& dse
 }
 
 // ----------------------------------------------------------------------------
-int process_bin_file(const uint8_t* pData, long size, const decode_settings& dsettings, const print_settings& psettings, FILE* pOutput)
+int process_bin_file(const uint8_t* data_ptr, long size, const decode_settings& dsettings, const print_settings& psettings, FILE* pOutput)
 {
-	buffer_reader buf(pData, size, 0);
+	buffer_reader buf(data_ptr, size, 0);
 	symbols bin_symbols;
 
 	disassembly disasm;
@@ -314,6 +314,77 @@ int process_bin_file(const uint8_t* pData, long size, const decode_settings& dse
 }
 
 // ----------------------------------------------------------------------------
+bool get_hex_value(char c, uint8_t& val)
+{
+	if (c >= '0' && c <= '9')
+	{
+		val = c - '0';
+		return true;
+	}
+	if (c >= 'A' && c <= 'F')
+	{
+		val = 10 + c - 'A';
+		return true;
+	}
+	if (c >= 'a' && c <= 'f')
+	{
+		val = 10 + c - 'a';
+		return true;
+	}
+	return false;
+}
+
+// ----------------------------------------------------------------------------
+int process_hex_string(const char* hex_string, const decode_settings& dsettings, const print_settings& psettings, FILE* pOutput)
+{
+	size_t strsize = strlen(hex_string);
+	if ((strsize & 1))
+	{
+		fprintf(stderr, "Hex string has odd number of characters\n");
+		return 1;
+	}
+
+	size_t byte_count = strsize / 2;
+	uint8_t* data_ptr = (uint8_t*)malloc(byte_count);
+
+	// Parse hex into binary data
+	for (size_t i = 0; i < byte_count; ++i)
+	{
+		uint8_t val1, val2;
+		if (!get_hex_value(hex_string[i * 2], val1) ||
+			!get_hex_value(hex_string[i * 2 + 1], val2))
+		{
+			fprintf(stderr, "Not a valid hex string '%s'\n", hex_string);
+			return 1;
+		}
+		data_ptr[i] = (val1 << 4) | val2;
+	}
+
+	// Wrap it up and decode
+	buffer_reader buf(data_ptr, byte_count, 0);
+	disassembly disasm;
+	int ret = decode_buf(buf, dsettings, disasm);
+	free(data_ptr);
+
+	if (ret)
+		return ret;
+
+	// Print it out
+	symbols dummy_symbols;
+	print(dummy_symbols, disasm, psettings, pOutput);
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
+// Operating mode: .prg file, binary file, or cmdline input
+enum DECODE_MODE
+{
+	MODE_TOS = 0,
+	MODE_BIN = 1,
+	MODE_HEX = 2
+};
+
+// ----------------------------------------------------------------------------
 int main(int argc, char** argv)
 {
 	if (argc < 2)
@@ -322,18 +393,24 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	bool is_tos = true;
+	DECODE_MODE mode = MODE_TOS;
 	print_settings psettings = {};
 	psettings.show_address = false;
 	psettings.show_timings = false;
+	const char* hex_data = NULL;
 
 	decode_settings dsettings = {};
 	dsettings.cpu_type = CPU_TYPE_68000;
+	// NOTE: this can be replaced if mode is hex
+	int last_arg = argc - 1;
 
-	for (int opt = 1; opt < argc - 1; ++opt)
+	for (int opt = 1; opt < last_arg; ++opt)
 	{
 		if (strcmp(argv[opt], "--bin") == 0)
-			is_tos = false;
+		{
+			mode = MODE_BIN;
+			last_arg = argc - 1;
+		}
 		else if (strcmp(argv[opt], "--address") == 0)
 			psettings.show_address = true;
 		else if (strcmp(argv[opt], "--timings") == 0)
@@ -344,6 +421,21 @@ int main(int argc, char** argv)
 			dsettings.cpu_type = CPU_TYPE_68020;
 		else if (strcmp(argv[opt], "--m68030") == 0)
 			dsettings.cpu_type = CPU_TYPE_68030;
+		else if (strcmp(argv[opt], "--hex") == 0)
+		{
+			++opt;
+			if (opt < argc)	// NOTE: not last_arg
+			{
+				hex_data = argv[opt];
+				last_arg = argc;
+				mode = MODE_HEX;
+				++opt;
+			}
+			else
+			{
+				fprintf(stderr, "--hex missing data argument");
+			}
+		}
 		else
 		{
 			fprintf(stderr, "Unknown switch: '%s'\n", argv[opt]);
@@ -351,30 +443,39 @@ int main(int argc, char** argv)
 		}
 	}
 
-	const char* fname = argv[argc - 1];
-	FILE* pInfile = fopen(fname, "rb");
-	if (!pInfile)
+	if (mode != MODE_HEX)
 	{
-		fprintf(stderr, "Can't read file: %s\n", fname);
-		return 1;
+		const char* fname = argv[argc - 1];
+		FILE* pInfile = fopen(fname, "rb");
+		if (!pInfile)
+		{
+			fprintf(stderr, "Can't read file: %s\n", fname);
+			return 1;
+		}
+
+		(void) fseek(pInfile, 0, SEEK_END);
+		long size = ftell(pInfile);
+
+		rewind(pInfile);
+		uint8_t* data_ptr = (uint8_t*) malloc(size);
+		long readBytes = fread(data_ptr, 1, size, pInfile);
+		fclose(pInfile);
+		if (readBytes != size)
+		{
+			fprintf(stderr, "Failed to read file contents\n");
+			return 1;
+		}
+		int ret = 0;
+		if (mode == MODE_TOS)
+			ret = process_tos_file(data_ptr, size, dsettings, psettings, stdout);
+		else if (mode == MODE_BIN)
+			ret = process_bin_file(data_ptr, size, dsettings, psettings, stdout);
+
+		free(data_ptr);
+		return ret;
 	}
-
-	(void) fseek(pInfile, 0, SEEK_END);
-	long size = ftell(pInfile);
-
-	rewind(pInfile);
-
-	uint8_t* pData = (uint8_t*) malloc(size);
-	long readBytes = fread(pData, 1, size, pInfile);
-	fclose(pInfile);
-	if (readBytes != size)
+	else if (mode == MODE_HEX)
 	{
-		fprintf(stderr, "Failed to read file contents\n");
-		return 1;
+		return process_hex_string(hex_data, dsettings, psettings, stdout);
 	}
-
-	if (is_tos)
-		return process_tos_file(pData, size, dsettings, psettings, stdout);
-	else
-		return process_bin_file(pData, size, dsettings, psettings, stdout);
 }
