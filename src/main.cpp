@@ -314,7 +314,7 @@ int process_bin_file(const uint8_t* data_ptr, long size, const decode_settings& 
 }
 
 // ----------------------------------------------------------------------------
-bool get_hex_value(char c, uint8_t& val)
+static bool get_hex_value(char c, uint8_t& val)
 {
 	if (c >= '0' && c <= '9')
 	{
@@ -335,33 +335,51 @@ bool get_hex_value(char c, uint8_t& val)
 }
 
 // ----------------------------------------------------------------------------
+static bool is_whitespace(char c)
+{
+	return c == ' ' || c == '\t';
+}
+
+// ----------------------------------------------------------------------------
 int process_hex_string(const char* hex_string, const decode_settings& dsettings, const print_settings& psettings, FILE* pOutput)
 {
 	size_t strsize = strlen(hex_string);
-	if ((strsize & 1))
+	// Allocate maximum bound for data
+	size_t max_byte_count = strsize / 2;
+	uint8_t* data_ptr = (uint8_t*)malloc(max_byte_count);
+
+	size_t num_written = 0;
+	size_t read_index = 0;
+	// We need at least 2 chars left to parse a hex byte.
+	while (read_index <= strsize - 2)
 	{
-		fprintf(stderr, "Hex string has odd number of characters\n");
+		uint8_t val1, val2;
+		// Get the next two bytes
+		bool success = get_hex_value(hex_string[read_index], val1);
+		success &= get_hex_value(hex_string[read_index + 1], val2);
+		read_index += 2;
+
+		if (!success)
+		{
+			fprintf(stderr, "Not a valid hex string '%s'\n", hex_string);
+			free(data_ptr);
+			return 1;
+		}
+		data_ptr[num_written++] = (val1 << 4) | val2;
+		// Skip any trailing whitespace
+		while (read_index < strsize && is_whitespace(hex_string[read_index]))
+			++read_index;
+	}
+	if (read_index != strsize)
+	{
+		// characters left at end of buffer
+		fprintf(stderr, "Not a valid hex string '%s'\n", hex_string);
+		free(data_ptr);
 		return 1;
 	}
 
-	size_t byte_count = strsize / 2;
-	uint8_t* data_ptr = (uint8_t*)malloc(byte_count);
-
-	// Parse hex into binary data
-	for (size_t i = 0; i < byte_count; ++i)
-	{
-		uint8_t val1, val2;
-		if (!get_hex_value(hex_string[i * 2], val1) ||
-			!get_hex_value(hex_string[i * 2 + 1], val2))
-		{
-			fprintf(stderr, "Not a valid hex string '%s'\n", hex_string);
-			return 1;
-		}
-		data_ptr[i] = (val1 << 4) | val2;
-	}
-
 	// Wrap it up and decode
-	buffer_reader buf(data_ptr, byte_count, 0);
+	buffer_reader buf(data_ptr, num_written, 0);
 	disassembly disasm;
 	int ret = decode_buf(buf, dsettings, disasm);
 	free(data_ptr);
