@@ -123,9 +123,10 @@ int print(const symbols& symbols, const disassembly& disasm, const print_setting
 // ----------------------------------------------------------------------------
 // Find addresses referenced by disasm instructions and add them to the
 // symbol table
+std::string label_prefix="L";
+uint32_t label_id = 0;
 void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 {
-	uint32_t label_id = 0;
 	for (size_t i = 0; i < disasm.lines.size(); ++i)
 	{
 		const disassembly::line& line = disasm.lines[i];
@@ -138,7 +139,7 @@ void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 			{
 				sym.address = target_address;
 				sym.section = symbol::section_type::TEXT;
-				sym.label = std::string("L") + std::to_string(label_id);
+				sym.label = label_prefix + std::to_string(label_id);
 				add_symbol(symbols, sym);
 				++label_id;
 			}
@@ -150,7 +151,7 @@ void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 			{
 				sym.address = target_address;
 				sym.section = symbol::section_type::TEXT;
-				sym.label = std::string("L") + std::to_string(label_id);
+				sym.label = label_prefix + std::to_string(label_id);
 				add_symbol(symbols, sym);
 				++label_id;
 			}
@@ -439,6 +440,30 @@ int main(int argc, char** argv)
 			dsettings.cpu_type = CPU_TYPE_68020;
 		else if (strcmp(argv[opt], "--m68030") == 0)
 			dsettings.cpu_type = CPU_TYPE_68030;
+		else if (strcmp(argv[opt], "--label-prefix") == 0)
+		{
+			opt++;
+			if (opt != argc)
+			{
+				label_prefix = argv[opt];
+			}
+			else
+			{
+				fprintf(stderr, "--label-prefix misses parameter");
+			}
+		}
+		else if (strcmp(argv[opt], "--label-start") == 0)
+		{
+			opt++;
+			if (opt != argc)
+			{
+				label_id = atoi(argv[opt]);
+			}
+			else
+			{
+				fprintf(stderr, "--label-start misses parameter");
+			}
+		}
 		else if (strcmp(argv[opt], "--hex") == 0)
 		{
 			++opt;
