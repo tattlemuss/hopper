@@ -15,10 +15,12 @@
 
 // ----------------------------------------------------------------------------
 // User options for output.
-struct print_settings
+struct output_settings
 {
-	bool show_address;
-	bool show_timings;
+	bool show_address;			// print address for each line before opcode
+	bool show_timings;			// print (guessed) timings for each line (valid for 68000 only)
+	std::string label_prefix;	// prefix for all auto-labels, normally "L"
+	uint32_t label_start_id;	// starting number of label prefix, normally 0
 };
 
 // ----------------------------------------------------------------------------
@@ -63,7 +65,7 @@ int decode_buf(buffer_reader& buf, const decode_settings& dsettings, disassembly
 
 // ----------------------------------------------------------------------------
 // Print a set of diassembled lines.
-int print(const symbols& symbols, const disassembly& disasm, const print_settings& psettings, FILE* pOutput)
+int print(const symbols& symbols, const disassembly& disasm, const output_settings& osettings, FILE* pOutput)
 {
 	// previous flag for timing pairs
 	uint8_t prev_flag = 0;
@@ -78,14 +80,14 @@ int print(const symbols& symbols, const disassembly& disasm, const print_setting
 		if (find_symbol(symbols, line.address, sym))
 			fprintf(pOutput, "%s:\n", sym.label.c_str());
 
-		if (psettings.show_address)
+		if (osettings.show_address)
 		{
 			fprintf(pOutput, ">> %04x:   $%04x ", line.address, line.inst.header);
 		}
 		fprintf(pOutput, "\t");
 		print(inst, symbols, line.address, pOutput);
 
-		if (psettings.show_timings && inst.opcode != Opcode::NONE)
+		if (osettings.show_timings && inst.opcode != Opcode::NONE)
 		{
 			timing timing;
 			if (calc_timing(inst, timing) != 0)
@@ -123,10 +125,9 @@ int print(const symbols& symbols, const disassembly& disasm, const print_setting
 // ----------------------------------------------------------------------------
 // Find addresses referenced by disasm instructions and add them to the
 // symbol table
-std::string label_prefix="L";
-uint32_t label_id = 0;
-void add_reference_symbols(const disassembly& disasm, symbols& symbols)
+void add_reference_symbols(const disassembly& disasm, const output_settings& settings, symbols& symbols)
 {
+	uint32_t label_id = settings.label_start_id;
 	for (size_t i = 0; i < disasm.lines.size(); ++i)
 	{
 		const disassembly::line& line = disasm.lines[i];
@@ -139,7 +140,7 @@ void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 			{
 				sym.address = target_address;
 				sym.section = symbol::section_type::TEXT;
-				sym.label = label_prefix + std::to_string(label_id);
+				sym.label = settings.label_prefix + std::to_string(label_id);
 				add_symbol(symbols, sym);
 				++label_id;
 			}
@@ -151,7 +152,7 @@ void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 			{
 				sym.address = target_address;
 				sym.section = symbol::section_type::TEXT;
-				sym.label = label_prefix + std::to_string(label_id);
+				sym.label = settings.label_prefix + std::to_string(label_id);
 				add_symbol(symbols, sym);
 				++label_id;
 			}
@@ -239,7 +240,7 @@ int read_symbols(buffer_reader& buf, const tos_header& header, symbols& symbols)
 }
 
 // ----------------------------------------------------------------------------
-int process_tos_file(const uint8_t* data_ptr, long size, const decode_settings& dsettings, const print_settings& psettings, FILE* pOutput)
+int process_tos_file(const uint8_t* data_ptr, long size, const decode_settings& dsettings, const output_settings& osettings, FILE* pOutput)
 {
 	buffer_reader buf(data_ptr, size, 0);
 	tos_header header = {};
@@ -292,14 +293,14 @@ int process_tos_file(const uint8_t* data_ptr, long size, const decode_settings& 
 	if (decode_buf(text_buf, dsettings, disasm))
 		return 1;
 
-	add_reference_symbols(disasm, exe_symbols);
+	add_reference_symbols(disasm, osettings, exe_symbols);
 
-	print(exe_symbols, disasm, psettings, pOutput);
+	print(exe_symbols, disasm, osettings, pOutput);
 	return 0;
 }
 
 // ----------------------------------------------------------------------------
-int process_bin_file(const uint8_t* data_ptr, long size, const decode_settings& dsettings, const print_settings& psettings, FILE* pOutput)
+int process_bin_file(const uint8_t* data_ptr, long size, const decode_settings& dsettings, const output_settings& osettings, FILE* pOutput)
 {
 	buffer_reader buf(data_ptr, size, 0);
 	symbols bin_symbols;
@@ -308,9 +309,9 @@ int process_bin_file(const uint8_t* data_ptr, long size, const decode_settings& 
 	if (decode_buf(buf, dsettings, disasm))
 		return 1;
 
-	add_reference_symbols(disasm, bin_symbols);
+	add_reference_symbols(disasm, osettings, bin_symbols);
 
-	print(bin_symbols, disasm, psettings, pOutput);
+	print(bin_symbols, disasm, osettings, pOutput);
 	return 0;
 }
 
@@ -342,7 +343,7 @@ static bool is_whitespace(char c)
 }
 
 // ----------------------------------------------------------------------------
-int process_hex_string(const char* hex_string, const decode_settings& dsettings, const print_settings& psettings, FILE* pOutput)
+int process_hex_string(const char* hex_string, const decode_settings& dsettings, const output_settings& osettings, FILE* pOutput)
 {
 	size_t strsize = strlen(hex_string);
 	// Allocate maximum bound for data
@@ -390,7 +391,7 @@ int process_hex_string(const char* hex_string, const decode_settings& dsettings,
 
 	// Print it out
 	symbols dummy_symbols;
-	print(dummy_symbols, disasm, psettings, pOutput);
+	print(dummy_symbols, disasm, osettings, pOutput);
 	return 0;
 }
 
@@ -413,9 +414,11 @@ int main(int argc, char** argv)
 	}
 
 	DECODE_MODE mode = MODE_TOS;
-	print_settings psettings = {};
-	psettings.show_address = false;
-	psettings.show_timings = false;
+	output_settings osettings = {};
+	osettings.show_address = false;
+	osettings.show_timings = false;
+	osettings.label_prefix = "L";
+	osettings.label_start_id = 0;
 	const char* hex_data = NULL;
 
 	decode_settings dsettings = {};
@@ -431,9 +434,9 @@ int main(int argc, char** argv)
 			last_arg = argc - 1;
 		}
 		else if (strcmp(argv[opt], "--address") == 0)
-			psettings.show_address = true;
+			osettings.show_address = true;
 		else if (strcmp(argv[opt], "--timings") == 0)
-			psettings.show_timings = true;
+			osettings.show_timings = true;
 		else if (strcmp(argv[opt], "--m68010") == 0)
 			dsettings.cpu_type = CPU_TYPE_68010;
 		else if (strcmp(argv[opt], "--m68020") == 0)
@@ -445,7 +448,7 @@ int main(int argc, char** argv)
 			opt++;
 			if (opt != argc)
 			{
-				label_prefix = argv[opt];
+				osettings.label_prefix = argv[opt];
 			}
 			else
 			{
@@ -457,7 +460,7 @@ int main(int argc, char** argv)
 			opt++;
 			if (opt != argc)
 			{
-				label_id = atoi(argv[opt]);
+				osettings.label_start_id = atoi(argv[opt]);
 			}
 			else
 			{
@@ -510,15 +513,15 @@ int main(int argc, char** argv)
 		}
 		int ret = 0;
 		if (mode == MODE_TOS)
-			ret = process_tos_file(data_ptr, size, dsettings, psettings, stdout);
+			ret = process_tos_file(data_ptr, size, dsettings, osettings, stdout);
 		else if (mode == MODE_BIN)
-			ret = process_bin_file(data_ptr, size, dsettings, psettings, stdout);
+			ret = process_bin_file(data_ptr, size, dsettings, osettings, stdout);
 
 		free(data_ptr);
 		return ret;
 	}
 	else if (mode == MODE_HEX)
 	{
-		return process_hex_string(hex_data, dsettings, psettings, stdout);
+		return process_hex_string(hex_data, dsettings, osettings, stdout);
 	}
 }
