@@ -32,7 +32,6 @@ bool calc_relative_address(const operand& op, uint32_t inst_address, uint32_t& t
 	{
 		if (op.indirect_index_68020.base_register == INDEX_REG_PC)
 		{
-			printf("**found***\n");
 			target_address = inst_address + op.indirect_index_68020.base_displacement;
 			return true;
 		}
