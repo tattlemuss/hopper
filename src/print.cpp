@@ -22,7 +22,7 @@ bool calc_relative_address(const operand& op, uint32_t inst_address, uint32_t& t
 		target_address = inst_address + op.pc_disp_index.inst_disp;
 		return true;
 	}
-	if (op.type == RELATIVE_BRANCH)
+	else if (op.type == RELATIVE_BRANCH)
 	{
 		target_address = inst_address + op.relative_branch.inst_disp;
 		return true;
