@@ -27,6 +27,16 @@ bool calc_relative_address(const operand& op, uint32_t inst_address, uint32_t& t
 		target_address = inst_address + op.relative_branch.inst_disp;
 		return true;
 	}
+	else if (op.type == INDIRECT_POSTINDEXED || op.type == INDIRECT_PREINDEXED ||
+			 op.type == MEMORY_INDIRECT || op.type == NO_MEMORY_INDIRECT)
+	{
+		if (op.indirect_index_68020.base_register == INDEX_REG_PC)
+		{
+			printf("**found***\n");
+			target_address = inst_address + op.indirect_index_68020.base_displacement;
+			return true;
+		}
+	}
 	return false;
 }
 
