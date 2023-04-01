@@ -405,13 +405,33 @@ enum DECODE_MODE
 };
 
 // ----------------------------------------------------------------------------
+void usage()
+{
+	fprintf(stdout, "hopper\n\n"
+		"Usage: hopper [options] input_filename|hexstring\n\n"
+		"options:\n"
+		"\t--hex       Input argument is hex string rather than filename\n"
+		"\t--bin       Read binary file rather than .prg\n"
+		"\t--address   Print instruction addresses\n"
+		"\t--timings   Print estimated timings (Atari ST 68000 only)\n"
+		"\t--m68010\n"
+		"\t--m68020\n"
+		"\t--m68030    Select CPU type (default m68000)\n"
+		"\t--label-prefix <string>   Set prefix for auto-labels\n"
+		"\t--label-start <int>       Set starting suffix number for auto-labels\n"
+	);
+}
+
+// ----------------------------------------------------------------------------
 int main(int argc, char** argv)
 {
 	if (argc < 2)
 	{
-		fprintf(stderr, "No filename\n");
+		fprintf(stderr, "Error: No filename or hexstring\n");
+		usage();
 		return 1;
 	}
+
 
 	DECODE_MODE mode = MODE_TOS;
 	output_settings osettings = {};
@@ -419,20 +439,17 @@ int main(int argc, char** argv)
 	osettings.show_timings = false;
 	osettings.label_prefix = "L";
 	osettings.label_start_id = 0;
-	const char* hex_data = NULL;
 
 	decode_settings dsettings = {};
 	dsettings.cpu_type = CPU_TYPE_68000;
-	// NOTE: this can be replaced if mode is hex
-	int last_arg = argc - 1;
+	const int last_arg = argc - 1;							// last arg is reserved for filename or hex data.
 
 	for (int opt = 1; opt < last_arg; ++opt)
 	{
 		if (strcmp(argv[opt], "--bin") == 0)
-		{
 			mode = MODE_BIN;
-			last_arg = argc - 1;
-		}
+		else if (strcmp(argv[opt], "--hex") == 0)
+			mode = MODE_HEX;							// Hex is now just a mode switch like --bin
 		else if (strcmp(argv[opt], "--address") == 0)
 			osettings.show_address = true;
 		else if (strcmp(argv[opt], "--timings") == 0)
@@ -446,45 +463,33 @@ int main(int argc, char** argv)
 		else if (strcmp(argv[opt], "--label-prefix") == 0)
 		{
 			opt++;
-			if (opt != argc)
+			if (opt < last_arg)
 			{
 				osettings.label_prefix = argv[opt];
 			}
 			else
 			{
-				fprintf(stderr, "--label-prefix misses parameter");
+				fprintf(stderr, "Error: --label-prefix misses parameter\n");
+				return 1;
 			}
 		}
 		else if (strcmp(argv[opt], "--label-start") == 0)
 		{
 			opt++;
-			if (opt != argc)
+			if (opt < last_arg)
 			{
 				osettings.label_start_id = atoi(argv[opt]);
 			}
 			else
 			{
-				fprintf(stderr, "--label-start misses parameter");
-			}
-		}
-		else if (strcmp(argv[opt], "--hex") == 0)
-		{
-			++opt;
-			if (opt < argc)	// NOTE: not last_arg
-			{
-				hex_data = argv[opt];
-				last_arg = argc;
-				mode = MODE_HEX;
-				++opt;
-			}
-			else
-			{
-				fprintf(stderr, "--hex missing data argument");
+				fprintf(stderr, "Error: --label-start misses parameter\n");
+				return 1;
 			}
 		}
 		else
 		{
-			fprintf(stderr, "Unknown switch: '%s'\n", argv[opt]);
+			fprintf(stderr, "Error: Unknown option: '%s'\n", argv[opt]);
+			usage();
 			return 1;
 		}
 	}
@@ -495,7 +500,7 @@ int main(int argc, char** argv)
 		FILE* pInfile = fopen(fname, "rb");
 		if (!pInfile)
 		{
-			fprintf(stderr, "Can't read file: %s\n", fname);
+			fprintf(stderr, "Error: Can't open file: %s\n", fname);
 			return 1;
 		}
 
@@ -508,7 +513,7 @@ int main(int argc, char** argv)
 		fclose(pInfile);
 		if (readBytes != size)
 		{
-			fprintf(stderr, "Failed to read file contents\n");
+			fprintf(stderr, "Error: Failed to read file contents\n");
 			return 1;
 		}
 		int ret = 0;
@@ -522,6 +527,7 @@ int main(int argc, char** argv)
 	}
 	else if (mode == MODE_HEX)
 	{
+		const char* hex_data = argv[argc - 1];
 		return process_hex_string(hex_data, dsettings, osettings, stdout);
 	}
 }
