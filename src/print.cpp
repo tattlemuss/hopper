@@ -3,7 +3,7 @@
 // representations that suit the use-case.
 #include "print.h"
 
-#include "instruction.h"
+#include "hopper68/instruction.h"
 #include "symbols.h"
 
 // ----------------------------------------------------------------------------

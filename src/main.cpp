@@ -6,12 +6,12 @@
 #include <string>
 #include <cstring>
 
-#include "buffer.h"
-#include "decode.h"
-#include "instruction.h"
+#include "hopper68/buffer.h"
+#include "hopper68/decode.h"
+#include "hopper68/instruction.h"
+#include "hopper68/timing.h"
 #include "symbols.h"
 #include "print.h"
-#include "timing.h"
 
 // ----------------------------------------------------------------------------
 // User options for output.
