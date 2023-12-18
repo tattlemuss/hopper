@@ -1,6 +1,8 @@
 #include "timing.h"
 #include "instruction.h"
 
+namespace hopper68
+{
 struct time_entry
 {
 	Opcode		op;
@@ -133,4 +135,5 @@ int calc_timing(const instruction& inst, timing& result)
 		return 0;
 	}
     return 1;
+}
 }

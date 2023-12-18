@@ -5,6 +5,9 @@
 #include "instruction.h"
 #include "buffer.h"
 
+namespace hopper68
+{
+
 // ----------------------------------------------------------------------------
 //	INSTRUCTION DECODE
 // ----------------------------------------------------------------------------
@@ -2174,3 +2177,5 @@ void decode(instruction& inst, buffer_reader& buffer, const decode_settings& dse
 		return;
 	}
 }
+}
+

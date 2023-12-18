@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <vector>
 
+namespace hopper68
+{
 struct instruction;
 
 #define PAIR_FRONT	(1<<0)		// If true, this instruction can pair with the previous one
@@ -16,6 +18,6 @@ struct timing
 };
 
 extern int calc_timing(const instruction& inst, timing& result);
-
+}
 #endif // TIMING_H
 

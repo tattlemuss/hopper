@@ -32,8 +32,8 @@ class disassembly
 public:
 	struct line
 	{
-		uint32_t    address;
-		instruction inst;
+		uint32_t address;
+		hopper68::instruction inst;
 	};
 
 	std::vector<line>    lines;
@@ -41,7 +41,7 @@ public:
 
 // ----------------------------------------------------------------------------
 // Read the buffer in a simple single pass.
-int decode_buf(buffer_reader& buf, const decode_settings& dsettings, disassembly& disasm)
+int decode_buf(hopper68::buffer_reader& buf, const hopper68::decode_settings& dsettings, disassembly& disasm)
 {
 	while (buf.get_remain() >= 2)
 	{
@@ -49,11 +49,11 @@ int decode_buf(buffer_reader& buf, const decode_settings& dsettings, disassembly
 		line.address = buf.get_pos();
 
 		// decode uses a copy of the buffer state
-		buffer_reader buf_copy(buf);
+		hopper68::buffer_reader buf_copy(buf);
 
 		// We can ignore the return code, since it just says "this instruction is valid"
 		// rather than "something catastrophic happened"
-		decode(line.inst, buf_copy, dsettings);
+		hopper68::decode(line.inst, buf_copy, dsettings);
 
 		// Handle failure
 		disasm.lines.push_back(line);
@@ -73,7 +73,7 @@ int print(const symbols& symbols, const disassembly& disasm, const output_settin
 	for (size_t i = 0; i < disasm.lines.size(); ++i)
 	{
 		const disassembly::line& line = disasm.lines[i];
-		const instruction& inst = line.inst;
+		const hopper68::instruction& inst = line.inst;
 
 		// TODO very naive label check
 		symbol sym;
@@ -87,9 +87,9 @@ int print(const symbols& symbols, const disassembly& disasm, const output_settin
 		fprintf(pOutput, "\t");
 		print(inst, symbols, line.address, pOutput);
 
-		if (osettings.show_timings && inst.opcode != Opcode::NONE)
+		if (osettings.show_timings && inst.opcode != hopper68::Opcode::NONE)
 		{
-			timing timing;
+			hopper68::timing timing;
 			if (calc_timing(inst, timing) != 0)
 			{
 				fprintf(pOutput, "\t; ?");
@@ -188,7 +188,7 @@ static const uint16_t DRI_SECT_TEXT = 0x0200;
 static const uint16_t DRI_SECT_DATA = 0x0400;
 static const uint16_t DRI_SECT_BSS  = 0x0100;
 
-int read_symbols(buffer_reader& buf, const tos_header& header, symbols& symbols)
+int read_symbols(hopper68::buffer_reader& buf, const tos_header& header, symbols& symbols)
 {
 	// Calculate text, data and bss addresses
 	uint32_t text_address = 0;
@@ -240,9 +240,10 @@ int read_symbols(buffer_reader& buf, const tos_header& header, symbols& symbols)
 }
 
 // ----------------------------------------------------------------------------
-int process_tos_file(const uint8_t* data_ptr, long size, const decode_settings& dsettings, const output_settings& osettings, FILE* pOutput)
+int process_tos_file(const uint8_t* data_ptr, long size, const hopper68::decode_settings& dsettings, 
+		const output_settings& osettings, FILE* pOutput)
 {
-	buffer_reader buf(data_ptr, size, 0);
+	hopper68::buffer_reader buf(data_ptr, size, 0);
 	tos_header header = {};
 
 	if (buf.read_word(header.ph_branch))
@@ -267,17 +268,17 @@ int process_tos_file(const uint8_t* data_ptr, long size, const decode_settings& 
 
 	// Next section is text
 	fprintf(pOutput, "; Reading text section\n");
-	buffer_reader text_buf(buf.get_data(), header.ph_tlen, 0);
+	hopper68::buffer_reader text_buf(buf.get_data(), header.ph_tlen, 0);
 
 	// Skip the text
 	buf.advance(header.ph_tlen);
-	buffer_reader data_buf(buf.get_data(), header.ph_dlen, 0);
+	hopper68::buffer_reader data_buf(buf.get_data(), header.ph_dlen, 0);
 
 	// Skip the data
 	buf.advance(header.ph_dlen);
 
 	// (No BSS in the file, so symbols should be next)
-	buffer_reader symbol_buf(buf.get_data(), header.ph_slen, 0);
+	hopper68::buffer_reader symbol_buf(buf.get_data(), header.ph_slen, 0);
 
 	symbols exe_symbols;
 
@@ -300,9 +301,10 @@ int process_tos_file(const uint8_t* data_ptr, long size, const decode_settings& 
 }
 
 // ----------------------------------------------------------------------------
-int process_bin_file(const uint8_t* data_ptr, long size, const decode_settings& dsettings, const output_settings& osettings, FILE* pOutput)
+int process_bin_file(const uint8_t* data_ptr, long size, const hopper68::decode_settings& dsettings, 
+		const output_settings& osettings, FILE* pOutput)
 {
-	buffer_reader buf(data_ptr, size, 0);
+	hopper68::buffer_reader buf(data_ptr, size, 0);
 	symbols bin_symbols;
 
 	disassembly disasm;
@@ -343,7 +345,7 @@ static bool is_whitespace(char c)
 }
 
 // ----------------------------------------------------------------------------
-int process_hex_string(const char* hex_string, const decode_settings& dsettings, const output_settings& osettings, FILE* pOutput)
+int process_hex_string(const char* hex_string, const hopper68::decode_settings& dsettings, const output_settings& osettings, FILE* pOutput)
 {
 	size_t strsize = strlen(hex_string);
 	// Allocate maximum bound for data
@@ -381,7 +383,7 @@ int process_hex_string(const char* hex_string, const decode_settings& dsettings,
 	}
 
 	// Wrap it up and decode
-	buffer_reader buf(data_ptr, num_written, 0);
+	hopper68::buffer_reader buf(data_ptr, num_written, 0);
 	disassembly disasm;
 	int ret = decode_buf(buf, dsettings, disasm);
 	free(data_ptr);
@@ -440,8 +442,8 @@ int main(int argc, char** argv)
 	osettings.label_prefix = "L";
 	osettings.label_start_id = 0;
 
-	decode_settings dsettings = {};
-	dsettings.cpu_type = CPU_TYPE_68000;
+	hopper68::decode_settings dsettings = {};
+	dsettings.cpu_type = hopper68::CPU_TYPE_68000;
 	const int last_arg = argc - 1;							// last arg is reserved for filename or hex data.
 
 	for (int opt = 1; opt < last_arg; ++opt)
@@ -455,11 +457,11 @@ int main(int argc, char** argv)
 		else if (strcmp(argv[opt], "--timings") == 0)
 			osettings.show_timings = true;
 		else if (strcmp(argv[opt], "--m68010") == 0)
-			dsettings.cpu_type = CPU_TYPE_68010;
+			dsettings.cpu_type = hopper68::CPU_TYPE_68010;
 		else if (strcmp(argv[opt], "--m68020") == 0)
-			dsettings.cpu_type = CPU_TYPE_68020;
+			dsettings.cpu_type = hopper68::CPU_TYPE_68020;
 		else if (strcmp(argv[opt], "--m68030") == 0)
-			dsettings.cpu_type = CPU_TYPE_68030;
+			dsettings.cpu_type = hopper68::CPU_TYPE_68030;
 		else if (strcmp(argv[opt], "--label-prefix") == 0)
 		{
 			opt++;

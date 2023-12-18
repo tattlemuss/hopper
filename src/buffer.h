@@ -3,6 +3,8 @@
 
 #include <cstdint>
 
+namespace hopper68
+{
 // ----------------------------------------------------------------------------
 // Bounded access to a range of memory
 class buffer_reader
@@ -95,4 +97,5 @@ private:
 	uint32_t		m_pos;
 };
 
+}
 #endif
