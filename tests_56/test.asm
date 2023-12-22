@@ -1,0 +1,63 @@
+	.org	p:0
+
+	ABS 	A
+	ABS	B
+
+	ADC	X,A
+	ADC	X,B
+	ADC	Y,A
+	ADC	Y,B
+
+	ADC	X,A	#100,X0
+	ADC	X,A	#100,X1
+	ADC	X,A	#-100,X0
+	ADC	X,A	#-100,X1
+
+	ADC	X,A	#-100,Y0
+	ADC	X,A	#-100,Y1
+	ADC	X,A	#100,A
+	ADC	X,A	#100,B
+	ADC	X,A	#100,A0
+	ADC	X,A	#100,B0
+	ADC	X,A	#100,X0
+	ADC	X,A	#100,X0
+
+	ADC	X,A	X0,Y0
+	ADC	X,A	Y1,N5
+	ADC	X,A	(R0)+N0
+	ADC	X,A	(R1)-N1
+	ADC	X,A	(R6)-
+	ADC	X,A	(R7)+
+
+	ADC	X,B	X:(R5)-N5,A
+	ADC	X,B	X:(R0)+N0,A
+	ADC	X,B	X:(R5)-,A
+	ADC	X,B	X:(R2)+,A
+	ADC	X,B	X:(R6+N6),A
+	ADC	X,B	X:(R7),A
+	ADC	X,B	X:-(R1),A
+	ADC	X,B	#6,X0
+	ADC	X,B	#$6000,X0
+	ADC	X,B	#-$6000,X0
+	ADC	X,B	X:$15,X0
+	ADC	X,B	X:$1500,X0
+	ADC	X,B	X0,X:$15
+
+	ADC	X,B	A,X:(R5)-N5
+	ADC	X,B	A,Y:(R5)-N5
+	ADC	X,B	A,X:(R0)+N0
+	ADC	X,B	A,Y:(R0)+N0
+	ADC	X,B	A,X:(R5)-
+	ADC	X,B	A,Y:(R5)-
+	ADC	X,B	A,X:(R0)+
+	ADC	X,B	A,Y:(R0)+
+
+	ADC	Y,B	A,X:$1234	A,Y0
+	ADC	Y,B	B,X:(R1)+	X0,B
+	ADC	Y,B	A,X:$1000	X0,A
+	ADC	Y,A	#$ABCDEF,R0
+
+	ADC	Y,A	Y:$1234,B1
+
+	ADC	X,A	B,X1		Y:(R6)-N6,B	
+
