@@ -39,30 +39,6 @@ public:
 	std::vector<line>    lines;
 };
 
-// ----------------------------------------------------------------------------
-// Read the buffer in a simple single pass.
-int decode_buf(hopper56::buffer_reader& buf, const hopper56::decode_settings& dsettings, disassembly& disasm)
-{
-	while (buf.get_remain() >= 1)
-	{
-		disassembly::line line;
-		line.address = buf.get_pos();
-
-		// decode uses a copy of the buffer state
-		hopper56::buffer_reader buf_copy(buf);
-
-		// We can ignore the return code, since it just says "this instruction is valid"
-		// rather than "something catastrophic happened"
-		hopper56::decode(line.inst, buf_copy, dsettings);
-
-		// Handle failure
-		disasm.lines.push_back(line);
-
-		buf.advance(line.inst.word_count);
-	}
-	return 0;
-}
-
 // Print an operand, for all operand types
 void print(const hopper56::operand& operand, FILE* pOutput)
 {
@@ -109,11 +85,11 @@ void print(const hopper56::operand& operand, FILE* pOutput)
 		case hopper56::operand::ABS:
 			fprintf(pOutput, "$%X", operand.abs.address);
 			break;
-		default:
-			fprintf(pOutput, "%d?", operand.type);
-			break;
 		case hopper56::operand::IMM:
 			fprintf(pOutput, "#$%X", operand.imm.val);
+			break;
+		default:
+			fprintf(pOutput, "unknown %d?", operand.type);
 			break;
 	}
 }
@@ -131,15 +107,7 @@ int print(const hopper56::instruction& inst, uint32_t address, FILE* pOutput)
 		if (i > 0)
 			fprintf(pOutput, ",");
 		
-		switch (op.type) 
-		{
-			case hopper56::operand::REG:
-				fprintf(pOutput, "%s", REGNAME(op.reg.index));
-				break;
-			default:
-				fprintf(pOutput, "%d", op.type);
-				break;
-		}
+		print(op, pOutput);
 	}
 
 	for (int i = 0; i < 2; ++i)
@@ -174,6 +142,35 @@ int print(const disassembly& disasm, const output_settings& osettings, FILE* pOu
 		fprintf(pOutput, "\t");
 		print(inst, line.address, pOutput);
 		fprintf(pOutput, "\n");
+	}
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
+// Read the buffer in a simple single pass.
+int decode_buf(hopper56::buffer_reader& buf, const hopper56::decode_settings& dsettings, disassembly& disasm)
+{
+	while (buf.get_remain() >= 1)
+	{
+		disassembly::line line;
+		line.address = buf.get_pos();
+
+		// decode uses a copy of the buffer state
+		hopper56::buffer_reader buf_copy(buf);
+
+		// We can ignore the return code, since it just says "this instruction is valid"
+		// rather than "something catastrophic happened"
+		hopper56::decode(line.inst, buf_copy, dsettings);
+
+		// Handle failure
+		disasm.lines.push_back(line);
+
+		// DEBUG
+		printf("%06x\t", line.inst.header);
+		print(line.inst, line.address, stdout);
+		printf("\n");
+
+		buf.advance(line.inst.word_count);
 	}
 	return 0;
 }

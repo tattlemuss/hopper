@@ -15,9 +15,9 @@
 
 	ADC	X,A	#-100,Y0
 	ADC	X,A	#-100,Y1
-	ADC	X,A	#100,A
+	ADC	X,B	#100,A
 	ADC	X,A	#100,B
-	ADC	X,A	#100,A0
+	ADC	X,B	#100,A0
 	ADC	X,A	#100,B0
 	ADC	X,A	#100,X0
 	ADC	X,A	#100,X0
@@ -35,29 +35,67 @@
 	ADC	X,B	X:(R2)+,A
 	ADC	X,B	X:(R6+N6),A
 	ADC	X,B	X:(R7),A
-	ADC	X,B	X:-(R1),A
+	ADC	X,B	X:-(R1),R3
+
+	ADC	X,B	Y:(R1)-N1,A
+	ADC	X,A	Y:(R0)+N0,B
+	ADC	X,B	Y:(R5)-,A
+	ADC	X,B	Y:(R2)+,X0
+	ADC	X,B	Y:(R6+N6),X1
+	ADC	X,B	Y:(R7),N2
+	ADC	X,B	Y:-(R1),A
+
 	ADC	X,B	#6,X0
 	ADC	X,B	#$6000,X0
-	ADC	X,B	#-$6000,X0
+	ADC	X,B	#$FFA000,X0
 	ADC	X,B	X:$15,X0
 	ADC	X,B	X:$1500,X0
 	ADC	X,B	X0,X:$15
 
 	ADC	X,B	A,X:(R5)-N5
-	ADC	X,B	A,Y:(R5)-N5
+	ADC	X,B			A,Y:(R5)-N5
 	ADC	X,B	A,X:(R0)+N0
-	ADC	X,B	A,Y:(R0)+N0
+	ADC	X,B			A,Y:(R0)+N0
 	ADC	X,B	A,X:(R5)-
-	ADC	X,B	A,Y:(R5)-
+	ADC	X,B			A,Y:(R5)-
 	ADC	X,B	A,X:(R0)+
-	ADC	X,B	A,Y:(R0)+
+	ADC	X,B			A,Y:(R0)+
 
 	ADC	Y,B	A,X:$1234	A,Y0
-	ADC	Y,B	B,X:(R1)+	X0,B
-	ADC	Y,B	A,X:$1000	X0,A
+	ADC	Y,A	B,X:(R1)+	X0,B
+	;ADC	Y,B	A,X:$100	X0,A
+
 	ADC	Y,A	#$ABCDEF,R0
 
 	ADC	Y,A	Y:$1234,B1
 
 	ADC	X,A	B,X1		Y:(R6)-N6,B	
+	ADC	X,A	Y0,B		B,Y:(R1)+
+	ADC	Y,B	Y0,A		A,Y:(R5+N5)
+	ADC	Y,B	A10,L:$1234
+	ADC	Y,B	B10,L:$1234
+	ADC	Y,B	A,L:$1234
+	ADC	Y,B	A,L:$1234
+	ADC	Y,B	X,L:$1234
+	ADC	Y,B	Y,L:$1234
+	ADC	Y,B	AB,L:$1234
+	ADC	Y,B	BA,L:$1234
 
+	ADC	X,A	X1,X:(R0)+	Y0,Y:(R4)+N4
+
+	ADD 	X0,A 	A,X1		A,Y:(R1)+
+	ADDL	A,B	#0,R0
+	ADDR 	B,A	X0,X:(R1)+N1	Y0,Y:(R4)-
+	AND	X0,A	(R5)-N5
+
+	ANDI	#$FE,CCR
+	ANDI	#$0,OMR
+	ANDI	#$FE,MR
+
+	ASL	A	(R3)-
+	ASR 	B	X:-(R3),R3
+	BCHG	#$7,X:<<$FFE2
+
+
+	NOP
+	NOP

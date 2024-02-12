@@ -4,7 +4,7 @@
 
 namespace hopper56
 {
-	enum Register
+	enum Reg
 	{
 		NONE,
 		
@@ -21,7 +21,11 @@ namespace hopper56
 		R0, R1, R2, R3, R4, R5, R6, R7,
 		N0, N1, N2, N3, N4, N5, N6, N7,
 		M0, M1, M2, M3, M4, M5, M6, M7,
-		REGISTER_COUNT
+
+		A10, B10, AB, BA,
+
+		MR, CCR, OMR, 
+		REG_COUNT
 	};
 
 	enum Memory
@@ -30,6 +34,7 @@ namespace hopper56
 		MEM_X = 1,
 		MEM_Y = 2,
 		MEM_P = 3,
+		MEM_L = 4,
 		MEM_COUNT
 	};
 
@@ -69,13 +74,13 @@ namespace hopper56
 
 			struct
 			{
-				Register index;			// any
+				Reg index;			// any
 			} reg, postdec, postinc, no_update, predec;
 
 			struct
 			{
-				Register index_1;		// Rn
-				Register index_2;		// Nn
+				Reg index_1;		// Rn
+				Reg index_2;		// Nn
 			} postdec_offset, postinc_offset, index_offset;
 
 			struct
@@ -102,7 +107,91 @@ namespace hopper56
 			INVALID = 0,
 			ABS,
 			ADC,
-
+			ADD,
+			ADDL,
+			ADDR,
+			AND, 
+			ANDI,
+			ASL,
+			ASL4,
+			ASR,
+			ASR16,
+			ASR4,
+			BCHG,
+			BCLR,
+			BSET,
+			BTSTH,
+			BTSTL,
+			BRA,
+			BRKcc,
+			BSR,
+			BScc,
+			Bcc,
+			CLR,
+			CLR24,
+			CMP,
+			CMPM,
+			DE_BUG,
+			DEBUGcc,
+			DEC,
+			DEC24,
+			DIV,
+			DMAC,
+			DO,
+			DOLoop,
+			ENDDO,
+			EOR,
+			EXT,
+			FOREVER,
+			IMAC,
+			IMPY,
+			INC,
+			INC24,
+			JMP,
+			JSR,
+			JScc,
+			Jcc,
+			LEA,
+			LSL,
+			LSR,
+			MAC,
+			MACR,
+			MOVE,
+			MOVEC,
+			MOVEI,
+			MOVEM,
+			MOVEP,
+			MOVES,
+			MPY,
+			MPYR,
+			NEG,
+			NEGC,
+			NOP,
+			NORM,
+			NOT,
+			OR,
+			ORI,
+			REP,
+			REPc,
+			RESET,
+			RND,
+			ROL,
+			ROR,
+			RTI,
+			RTS,
+			SBC,
+			STOP,
+			SUB,
+			SUBL,
+			SWAP,
+			SWI,
+			TFR,
+			TFR2,
+			TST,
+			TST2,
+			Tcc,
+			WAIT,
+			ZERO,
 			OPCODE_COUNT
 		};
 	
@@ -121,7 +210,7 @@ namespace hopper56
 	// ----------------------------------------------------------------------------
 	// Helper functions to convert parts of the instruction to strings.
 	extern const char* get_opcode_string(instruction::Opcode opcode);
-	extern const char* get_register_string(Register reg);
+	extern const char* get_register_string(Reg reg);
 	extern const char* get_memory_string(Memory mem);
 }
 
