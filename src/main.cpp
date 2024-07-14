@@ -26,6 +26,51 @@ struct output_settings
 // ----------------------------------------------------------------------------
 //	HIGHER-LEVEL DISASSEMBLY CREATION
 // ----------------------------------------------------------------------------
+
+// Storage for line numbers
+class line_numbers
+{
+public:
+	struct line
+	{
+		size_t file_index;
+		uint32_t line;
+	};
+
+	std::vector<std::string>	filenames;
+
+	typedef std::pair<uint32_t, line> pair;
+	std::map<uint32_t, line>	lines;
+
+	void add(size_t file_index, uint32_t line_num, uint32_t pc)
+	{
+		pair p;
+		p.first = pc;
+		p.second.file_index = file_index;
+		p.second.line = line_num;
+		lines.insert(p);
+	}
+
+	bool find(uint32_t address, line& result) const
+	{
+		std::map<uint32_t, line>::const_iterator it = lines.find(address);
+		if (it != lines.end())
+		{
+			result = it->second;
+			return true;
+		}
+		return false;
+	}
+
+	size_t add_filename(const char* filename)
+	{
+		size_t index = filenames.size();
+		filenames.push_back(filename);
+		return index;
+	}
+};
+
+// ----------------------------------------------------------------------------
 // Storage for an attempt at tokenising the memory
 class disassembly
 {
@@ -65,11 +110,13 @@ int decode_buf(hopper68::buffer_reader& buf, const hopper68::decode_settings& ds
 
 // ----------------------------------------------------------------------------
 // Print a set of diassembled lines.
-int print(const symbols& symbols, const disassembly& disasm, const output_settings& osettings, FILE* pOutput)
+int print(const symbols& symbols, const line_numbers& lines,
+	const disassembly& disasm, const output_settings& osettings, FILE* pOutput)
 {
 	// previous flag for timing pairs
 	uint8_t prev_flag = 0;
 
+	size_t last_file_index = (size_t)-1;
 	for (size_t i = 0; i < disasm.lines.size(); ++i)
 	{
 		const disassembly::line& line = disasm.lines[i];
@@ -79,6 +126,20 @@ int print(const symbols& symbols, const disassembly& disasm, const output_settin
 		symbol sym;
 		if (find_symbol(symbols, line.address, sym))
 			fprintf(pOutput, "%s:\n", sym.label.c_str());
+
+		// Debug line-number checks
+		line_numbers::line ln;
+		if (lines.find(line.address, ln))
+		{
+			if (ln.file_index != last_file_index)
+			{
+				// Change of active file
+				std::string filename = lines.filenames[ln.file_index];
+				fprintf(pOutput, "; File: %s\n", filename.c_str());
+				last_file_index = ln.file_index;
+			}
+			fprintf(pOutput, "line %04u ", ln.line);
+		}
 
 		if (osettings.show_address)
 		{
@@ -240,6 +301,208 @@ int read_symbols(hopper68::buffer_reader& buf, const tos_header& header, symbols
 }
 
 // ----------------------------------------------------------------------------
+//	DEBUG LINE READING
+// ----------------------------------------------------------------------------
+// Read N bytes of string data in to a std::string, omitting pad bytes
+static int read_string(hopper68::buffer_reader& buf, uint32_t length, std::string& str)
+{
+	uint8_t ch;
+	for (uint32_t i = 0; i < length; ++i)
+	{
+		if (buf.read_byte(ch))
+			return 1;
+		if (ch)	// Don't add any padded zero bytes
+			str += (char)ch;
+	}
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
+// Read hunk of "LINE" format line information.
+// This is a simple set of "line", "pc" 8-byte structures
+static int read_debug_line_info(hopper68::buffer_reader& buf, line_numbers& lines, uint32_t offset)
+{
+	// Filename length is stored as divided by 4
+	uint32_t flen;
+	if (buf.read_long(flen))
+		return 1;
+	flen <<= 2;
+	std::string fname;
+	if (read_string(buf, flen, fname))
+		return 1;
+	size_t file_index = lines.add_filename(fname.c_str());
+
+	// Calculate remaining number of structures to read
+	uint32_t numlines = buf.get_remain() / 8;
+	while (numlines)
+	{
+		uint32_t line, pc;
+		if (buf.read_long(line))
+			return 1;
+		if (buf.read_long(pc))
+			return 1;
+
+		lines.add(file_index, line, pc + offset);
+		--numlines;
+	}
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
+// Read a single compressed HCLN value (line or PC)
+// The format is a simple prefix compression:
+// 		 1 byte: return value if != 0
+// 	else 2 byte word: return value if != 0
+//  else 4 byte long.
+static int read_hcln_long(hopper68::buffer_reader& buf, uint32_t& val)
+{
+	uint8_t tmpB;
+	if (buf.read_byte(tmpB))
+		return 1;
+	if (tmpB)
+	{
+		val = tmpB; return 0;
+	}
+
+	uint16_t tmpW;
+	if (buf.read_word(tmpW))
+		return 1;
+	if (tmpW)
+	{
+		val = tmpW; return 0;
+	}
+
+	return buf.read_long(val);
+}
+
+// ----------------------------------------------------------------------------
+// Read hunk of "HCLN" (HiSoft Compressed Line Number) format line information.
+static int read_debug_hcln_info(hopper68::buffer_reader& buf, line_numbers& lines, uint32_t offset)
+{
+	uint32_t flen, numlines;
+	// Filename length is stored as divided by 4
+	if (buf.read_long(flen))
+		return 1;
+	std::string fname;
+	flen <<= 2;
+	if (read_string(buf, flen, fname))
+		return 1;
+	size_t file_index = lines.add_filename(fname.c_str());
+
+	if (buf.read_long(numlines))
+		return 1;
+	uint32_t curr_line = 0;
+	uint32_t curr_pc = offset;
+	while (numlines)
+	{
+		uint32_t line, pc;
+		if (read_hcln_long(buf, line))
+			return 1;
+		if (read_hcln_long(buf, pc))
+			return 1;
+		// Accumulate current position
+		curr_line += line;
+		curr_pc += pc;
+		lines.add(file_index, curr_line, curr_pc);
+		--numlines;
+	}
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
+// Read relocation information and debug line number information.
+static int read_reloc(hopper68::buffer_reader& buf, line_numbers& lines)
+{
+	uint32_t addr;
+	if (buf.read_long(addr))
+		return 1;
+
+	// 0 at start meeans "no reloc info"
+	if (addr)
+	{
+		while (1)
+		{
+			uint8_t offset;
+			if (buf.read_byte(offset))
+				return 1;
+			if (offset == 0)
+				break;
+
+			if (offset == 1)
+			{
+				addr += 254;
+				continue;
+			}
+			else
+			{
+				addr += offset;
+			}
+		}
+	}
+
+	// Read debugging information
+	// Align to word
+	if (buf.get_pos() & 1)
+		buf.advance(1);
+
+	// Debug information is a set of blocks ("hunks"?) with a
+	// type and size, similar to IFF.
+	bool got_header = false;
+	while (buf.get_remain() >= 4)
+	{
+		uint32_t hunk_header;
+		uint32_t hlen, hstart, offset, htype;
+
+		if (buf.read_long(hunk_header))
+			return 1;
+		if ( (hunk_header==0) && got_header)
+			break;			// zero might mean padded, so stop without error
+
+		// Expect the magic "this is a hunk" value
+		if (hunk_header != 0x3F1)
+			return 1;			// (bad file)
+
+		// Read hunk length, which is number of 32-byte longs
+		if (buf.read_long(hlen))
+			return 1;
+		// Convert header length to bytes
+		hlen <<= 2;
+		hstart = buf.get_pos();	// record position for jumping
+
+		// Create a sub-reader so we don't read off end of the hunk
+		hopper68::buffer_reader hunk_buffer(buf.get_data(), hlen, buf.get_address());
+		// This appears to be an offset to apply to the PC values
+		if (hunk_buffer.read_long(offset))
+			return 1;
+		if (hunk_buffer.read_long(htype))
+			return 1;
+
+		switch (htype)
+		{
+			// NOTE: the X-Debug example does stricter checks on format here.
+			// We just record that a header is found before the per-file hunks
+			// are encountered.
+			case 0x48454144: // "HEAD"
+				got_header = true;
+				break;
+			case 0x4c494e45: // "LINE"
+				read_debug_line_info(hunk_buffer, lines, offset);
+				break;
+			case 0x48434c4e: // "HCLN"
+				read_debug_hcln_info(hunk_buffer, lines, offset);
+				break;
+			default:
+				return 1;
+		}
+
+		// Jump to next hunk
+		buf.set_pos(hstart + hlen);
+	}
+
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
 int process_tos_file(const uint8_t* data_ptr, long size, const hopper68::decode_settings& dsettings, 
 		const output_settings& osettings, FILE* pOutput)
 {
@@ -281,6 +544,7 @@ int process_tos_file(const uint8_t* data_ptr, long size, const hopper68::decode_
 	hopper68::buffer_reader symbol_buf(buf.get_data(), header.ph_slen, 0);
 
 	symbols exe_symbols;
+	line_numbers lines;
 
 	fprintf(pOutput, "; Reading symbols...\n");
 	int ret = read_symbols(symbol_buf, header, exe_symbols);
@@ -290,13 +554,17 @@ int process_tos_file(const uint8_t* data_ptr, long size, const hopper68::decode_
 		return ret;
 	}
 
+	buf.advance(header.ph_slen);
+	hopper68::buffer_reader reloc_buf(buf.get_data(), buf.get_remain(), 0);
+	read_reloc(reloc_buf, lines);
+
 	disassembly disasm;
 	if (decode_buf(text_buf, dsettings, disasm))
 		return 1;
 
 	add_reference_symbols(disasm, osettings, exe_symbols);
 
-	print(exe_symbols, disasm, osettings, pOutput);
+	print(exe_symbols, lines, disasm, osettings, pOutput);
 	return 0;
 }
 
@@ -306,6 +574,7 @@ int process_bin_file(const uint8_t* data_ptr, long size, const hopper68::decode_
 {
 	hopper68::buffer_reader buf(data_ptr, size, 0);
 	symbols bin_symbols;
+	line_numbers dummy_lines;
 
 	disassembly disasm;
 	if (decode_buf(buf, dsettings, disasm))
@@ -313,7 +582,7 @@ int process_bin_file(const uint8_t* data_ptr, long size, const hopper68::decode_
 
 	add_reference_symbols(disasm, osettings, bin_symbols);
 
-	print(bin_symbols, disasm, osettings, pOutput);
+	print(bin_symbols, dummy_lines, disasm, osettings, pOutput);
 	return 0;
 }
 
@@ -393,7 +662,9 @@ int process_hex_string(const char* hex_string, const hopper68::decode_settings& 
 
 	// Print it out
 	symbols dummy_symbols;
-	print(dummy_symbols, disasm, osettings, pOutput);
+	line_numbers dummy_lines;
+
+	print(dummy_symbols, dummy_lines, disasm, osettings, pOutput);
 	return 0;
 }
 
