@@ -195,8 +195,10 @@ L1:
 	rol.w	4(a0)
 	roxr.w	0(a0,d0.w)
 	roxl.w	$1234.l
-	
 L2:
 	nop
 L3:
 	nop
+	move.l	6(a0,a2.l),d0
+	move.l	-6(a7,a7.w),d0
+	lea	0(a0,a0.l),a0
