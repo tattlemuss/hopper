@@ -70,6 +70,13 @@ public:
 			m_pos = m_length;
 	}
 
+	void set_pos(uint32_t pos)
+	{
+		m_pos = pos;
+		if (m_pos > m_length)
+			m_pos = m_length;
+	}
+
 	const uint8_t* get_data() const
 	{
 		return m_pData + m_pos;
