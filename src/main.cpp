@@ -138,7 +138,7 @@ int print(const symbols& symbols, const line_numbers& lines,
 				fprintf(pOutput, "; File: %s\n", filename.c_str());
 				last_file_index = ln.file_index;
 			}
-			fprintf(pOutput, "line %04u ", ln.line);
+			fprintf(pOutput, "; line %04u:\n", ln.line);
 		}
 
 		if (osettings.show_address)
