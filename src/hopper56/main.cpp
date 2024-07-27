@@ -98,6 +98,9 @@ int print(const hop56::instruction& inst, uint32_t address, FILE* pOutput)
 {
 	fprintf(pOutput, "%s\t", hop56::get_opcode_string(inst.opcode));
 
+	if (inst.neg_operands)
+		fprintf(pOutput, "-");
+
 	for (int i = 0; i < 3; ++i)
 	{
 		const hop56::operand& op = inst.operands[i];
@@ -117,6 +120,8 @@ int print(const hop56::instruction& inst, uint32_t address, FILE* pOutput)
 			continue;	// skip if there is no first operand
 
 		fprintf(pOutput, "\t");
+		assert(!inst.neg_operands);
+
 		print(pmove.operands[0], pOutput);
 
 		if (pmove.operands[1].type == hop56::operand::NONE)
@@ -166,9 +171,9 @@ int decode_buf(hop56::buffer_reader& buf, const hop56::decode_settings& dsetting
 		disasm.lines.push_back(line);
 
 		// DEBUG
-		printf("%06x\t", line.inst.header);
-		print(line.inst, line.address, stdout);
-		printf("\n");
+		//printf("%06x\t", line.inst.header);
+		//print(line.inst, line.address, stdout);
+		//printf("\n");
 
 		buf.advance(line.inst.word_count);
 	}

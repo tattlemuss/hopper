@@ -84,6 +84,7 @@ namespace hop56
 		"STOP",
 		"SUB",
 		"SUBL",
+		"SUBR",
 		"SWAP",
 		"SWI",
 		"TFR",
@@ -117,14 +118,14 @@ namespace hop56
 		// Register pairs/parts for MOVEL types
 		"A10", "B10", "AB", "BA",
 
-		"MR", "CCR", "OMR", 
-		
+		"MR", "CCR", "OMR",
+
 	};
 
 	// ----------------------------------------------------------------------------
 	const char* g_memory_names[Memory::MEM_COUNT] =
 	{
-		"", "X:", "Y:", "P:", "L:"	
+		"", "X:", "Y:", "P:", "L:"
 	};
 
 #define ARRAY_SIZE(a)		 (sizeof(a) / sizeof(a[0]))
@@ -168,6 +169,7 @@ namespace hop56
 		header = 0U;
 		word_count = 1U;
 		opcode = Opcode::INVALID;
+		neg_operands = 0;
 		operands[0].reset();
 		operands[1].reset();
 		operands[2].reset();

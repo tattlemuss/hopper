@@ -7,7 +7,7 @@ namespace hop56
 	enum Reg
 	{
 		NONE,
-		
+
 		A,
 		B,
 		X,
@@ -24,7 +24,7 @@ namespace hop56
 
 		A10, B10, AB, BA,
 
-		MR, CCR, OMR, 
+		MR, CCR, OMR,
 		REG_COUNT
 	};
 
@@ -110,7 +110,7 @@ namespace hop56
 			ADD,
 			ADDL,
 			ADDR,
-			AND, 
+			AND,
 			ANDI,
 			ASL,
 			ASL4,
@@ -183,6 +183,7 @@ namespace hop56
 			STOP,
 			SUB,
 			SUBL,
+			SUBR,
 			SWAP,
 			SWI,
 			TFR,
@@ -194,7 +195,7 @@ namespace hop56
 			ZERO,
 			OPCODE_COUNT
 		};
-	
+
 		instruction();
 		void reset();
 
@@ -203,6 +204,7 @@ namespace hop56
 		int word_count;			// size in 56-bit words
 
 		Opcode opcode;
+		int neg_operands;		// if !=0, add "-" to the operands
 		operand operands[3];
 		pmove pmoves[2];
 	};

@@ -43,6 +43,22 @@ namespace hop56
 	};
 
 	// ========================================================================
+	//	OPCODE TABLE FOR PARALLEL MOVE INSTRUCTIONS
+	// ========================================================================
+
+	struct pmove_entry
+	{
+		instruction::Opcode opcode;
+		uint8_t				neg;
+		Reg					regs[3];
+	};
+
+	#define PM_ENTRY(opcode, neg, reg0, reg1, reg2)		\
+		{ instruction::Opcode::opcode, neg, { Reg::reg0, Reg::reg1, Reg::reg2 } }
+
+#include "pmove_table.i"
+
+	// ========================================================================
 	// Setters for operands
 
 	// Create R-register from 0-7 index
@@ -369,373 +385,31 @@ namespace hop56
 		return 0;
 	}
 
-	// ========================================================================
-	//	PARALLEL MOVE OPCODE FUNCTIONS
-	// ========================================================================
-	static int dummy(instruction& inst, uint32_t header, const decode_settings&, buffer_reader& buf)
-	{
-		return 1;
-	}
-
-	static int alu_d(instruction& inst, uint32_t header, const decode_settings& settings, buffer_reader& buf)
-	{
-		uint32_t a_or_b = (header >> 3) & 1;
-		inst.operands[0].type = operand::REG;
-		inst.operands[0].reg.index = a_or_b ? Reg::B : Reg::A;
-		return decode_pmove(inst, header, settings, buf);
-	}
-
-	static int adc(instruction& inst, uint32_t header, const decode_settings& settings, buffer_reader& buf)
-	{
-		uint32_t x_or_y = (header >> 4) & 1;
-		set_reg(inst.operands[0], x_or_y ? Reg::Y : Reg::X);
-		uint32_t a_or_b = (header >> 3) & 1;
-		set_reg(inst.operands[1], a_or_b ? Reg::B : Reg::A);
-		return decode_pmove(inst, header, settings, buf);
-	}
-
-	static int alu_JJJd(instruction& inst, uint32_t header, const decode_settings& settings, buffer_reader& buf)
-	{
-		uint32_t JJJd = (header >> 3) & 0xf;
-		uint32_t d = (header >> 4) & 0x1;
-		static Reg sources[16] =
-		{
-			Reg::NONE, Reg::NONE, Reg::B,  Reg::A,  Reg::X,  Reg::X,  Reg::Y,  Reg::Y,
-			Reg::X0,   Reg::X0,   Reg::Y0, Reg::Y0, Reg::X1, Reg::X1, Reg::Y1, Reg::Y1
-		};
-		set_reg(inst.operands[0], sources[JJJd]);
-		set_reg(inst.operands[1], d ? Reg::B : Reg::A);
-		if (sources[JJJd] == Reg::NONE)
-		   return 1;
-		return decode_pmove(inst, header, settings, buf);
-	}
-
-	static int alu_JJd(instruction& inst, uint32_t header, const decode_settings& settings, buffer_reader& buf)
-	{
-		uint32_t JJ = (header >> 4) & 0x3;
-		uint32_t d = (header >> 3) & 0x1;
-		static Reg sources[4] = 		{ Reg::X0,   Reg::Y0, Reg::X1, Reg::Y1 };
-		set_reg(inst.operands[0], sources[JJ]);
-		set_reg(inst.operands[1], d ? Reg::B : Reg::A);
-		return decode_pmove(inst, header, settings, buf);
-	}
-
-	static int addl(instruction& inst, uint32_t header, const decode_settings& settings, buffer_reader& buf)
-	{
-		uint32_t d = (header >> 3) & 0x1;
-		set_reg(inst.operands[0], d ? Reg::A : Reg::B);
-		set_reg(inst.operands[1], d ? Reg::B : Reg::A);
-		return decode_pmove(inst, header, settings, buf);
-	}
-
-	// ========================================================================
-	//	OPCODE TABLE FOR PARALLEL MOVE INSTRUCTIONS
-	// ========================================================================
-	static const op_entry pm_entries[256] =
-	{
-		// 0x
-		ENTRY(ADD,     alu_JJJd),				// 0000 0000
-		ENTRY(INVALID, dummy),					// 0000 0001
-		ENTRY(ADDR,    addl),					// 0000 0010
-		ENTRY(INVALID, dummy),					// 0000 0011
-		ENTRY(INVALID, dummy),					// 0000 0100
-		ENTRY(INVALID, dummy),					// 0000 0101
-		ENTRY(INVALID, dummy),					// 0000 0110
-		ENTRY(INVALID, dummy),					// 0000 0111
-		ENTRY(ADD,     alu_JJJd),				// 0000 1000
-		ENTRY(INVALID, dummy),					// 0000 1001
-		ENTRY(ADDR,    addl),					// 0000 1010
-		ENTRY(INVALID, dummy),					// 0000 1011
-		ENTRY(INVALID, dummy),					// 0000 1100
-		ENTRY(INVALID, dummy),					// 0000 1101
-		ENTRY(INVALID, dummy),					// 0000 1110
-		ENTRY(INVALID, dummy),					// 0000 1111
-
-		// 1x
-		ENTRY(ADD,     alu_JJJd),				// 0001 0000
-		ENTRY(INVALID, dummy),					// 0001 0001
-		ENTRY(ADDL,    addl),					// 0001 0010
-		ENTRY(INVALID, dummy),					// 0001 0011
-		ENTRY(INVALID, dummy),					// 0001 0100
-		ENTRY(INVALID, dummy),					// 0001 0101
-		ENTRY(INVALID, dummy),					// 0001 0110
-		ENTRY(INVALID, dummy),					// 0001 0111
-		ENTRY(ADD,     alu_JJJd),				// 0001 1000
-		ENTRY(INVALID, dummy),					// 0001 1001
-		ENTRY(ADDL,    addl),					// 0001 1010
-		ENTRY(INVALID, dummy),					// 0001 1011
-		ENTRY(INVALID, dummy),					// 0001 1100
-		ENTRY(INVALID, dummy),					// 0001 1101
-		ENTRY(INVALID, dummy),					// 0001 1110
-		ENTRY(INVALID, dummy),					// 0001 1111
-
-		// 2x
-		ENTRY(ADD,     alu_JJJd),				// 0010 0000
-		ENTRY(ADC,     adc),					// 0010 0001
-		ENTRY(ASR,     alu_d),					// 0010 0010
-		ENTRY(INVALID, dummy),					// 0010 0011
-		ENTRY(INVALID, dummy),					// 0010 0100
-		ENTRY(INVALID, dummy),					// 0010 0101
-		ENTRY(ABS,     alu_d),					// 0010 0110
-		ENTRY(INVALID, dummy),					// 0010 0111
-		ENTRY(ADD,     alu_JJJd),				// 0010 1000
-		ENTRY(ADC,     adc),					// 0010 1001
-		ENTRY(ASR,     alu_d),					// 0010 1010
-		ENTRY(INVALID, dummy),					// 0010 1011
-		ENTRY(INVALID, dummy),					// 0010 1100
-		ENTRY(INVALID, dummy),					// 0010 1101
-		ENTRY(ABS,     alu_d),					// 0010 1110
-		ENTRY(INVALID, dummy),					// 0010 1111
-
-		// 3x
-		ENTRY(ADD,     alu_JJJd),				// 0011 0000
-		ENTRY(ADC,     adc),					// 0011 0001
-		ENTRY(ASL,     alu_d),					// 0011 0010
-		ENTRY(INVALID, dummy),					// 0011 0011
-		ENTRY(INVALID, dummy),					// 0011 0100
-		ENTRY(INVALID, dummy),					// 0011 0101
-		ENTRY(INVALID, dummy),					// 0011 0110
-		ENTRY(INVALID, dummy),					// 0011 0111
-		ENTRY(ADD,     alu_JJJd),				// 0011 1000
-		ENTRY(ADC,     adc),					// 0011 1001
-		ENTRY(ASL,     alu_d),					// 0011 1010
-		ENTRY(INVALID, dummy),					// 0011 1011
-		ENTRY(INVALID, dummy),					// 0011 1100
-		ENTRY(INVALID, dummy),					// 0011 1101
-		ENTRY(INVALID, dummy),					// 0011 1110
-		ENTRY(INVALID, dummy),					// 0011 1111
-
-		// 4x
-		ENTRY(ADD,     alu_JJJd),				// 0100 0000
-		ENTRY(INVALID, dummy),					// 0100 0001
-		ENTRY(INVALID, dummy),					// 0100 0010
-		ENTRY(INVALID, dummy),					// 0100 0011
-		ENTRY(INVALID, dummy),					// 0100 0100
-		ENTRY(INVALID, dummy),					// 0100 0101
-		ENTRY(AND,     alu_JJd),				// 0100 0110
-		ENTRY(INVALID, dummy),					// 0100 0111
-		ENTRY(ADD,     alu_JJJd),				// 0100 1000
-		ENTRY(INVALID, dummy),					// 0100 1001
-		ENTRY(INVALID, dummy),					// 0100 1010
-		ENTRY(INVALID, dummy),					// 0100 1011
-		ENTRY(INVALID, dummy),					// 0100 1100
-		ENTRY(INVALID, dummy),					// 0100 1101
-		ENTRY(AND,     alu_JJd),				// 0100 1110
-		ENTRY(INVALID, dummy),					// 0100 1111
-
-		// 5x
-		ENTRY(ADD,     alu_JJJd),				// 0101 0000
-		ENTRY(INVALID, dummy),					// 0101 0001
-		ENTRY(INVALID, dummy),					// 0101 0010
-		ENTRY(INVALID, dummy),					// 0101 0011
-		ENTRY(INVALID, dummy),					// 0101 0100
-		ENTRY(INVALID, dummy),					// 0101 0101
-		ENTRY(AND,     alu_JJd),				// 0101 0110
-		ENTRY(INVALID, dummy),					// 0101 0111
-		ENTRY(ADD,     alu_JJJd),				// 0101 1000
-		ENTRY(INVALID, dummy),					// 0101 1001
-		ENTRY(INVALID, dummy),					// 0101 1010
-		ENTRY(INVALID, dummy),					// 0101 1011
-		ENTRY(INVALID, dummy),					// 0101 1100
-		ENTRY(INVALID, dummy),					// 0101 1101
-		ENTRY(AND,     alu_JJd),				// 0101 1110
-		ENTRY(INVALID, dummy),					// 0101 1111
-
-		// 6x
-		ENTRY(ADD,     alu_JJJd),				// 0110 0000
-		ENTRY(INVALID, dummy),					// 0110 0001
-		ENTRY(INVALID, dummy),					// 0110 0010
-		ENTRY(INVALID, dummy),					// 0110 0011
-		ENTRY(INVALID, dummy),					// 0110 0100
-		ENTRY(INVALID, dummy),					// 0110 0101
-		ENTRY(AND,     alu_JJd),				// 0110 0110
-		ENTRY(INVALID, dummy),					// 0110 0111
-		ENTRY(ADD,     alu_JJJd),				// 0110 1000
-		ENTRY(INVALID, dummy),					// 0110 1001
-		ENTRY(INVALID, dummy),					// 0110 1010
-		ENTRY(INVALID, dummy),					// 0110 1011
-		ENTRY(INVALID, dummy),					// 0110 1100
-		ENTRY(INVALID, dummy),					// 0110 1101
-		ENTRY(AND,     alu_JJd),				// 0110 1110
-		ENTRY(INVALID, dummy),					// 0110 1111
-
-		// 7x
-		ENTRY(ADD,     alu_JJJd),				// 0111 0000
-		ENTRY(INVALID, dummy),					// 0111 0001
-		ENTRY(INVALID, dummy),					// 0111 0010
-		ENTRY(INVALID, dummy),					// 0111 0011
-		ENTRY(INVALID, dummy),					// 0111 0100
-		ENTRY(INVALID, dummy),					// 0111 0101
-		ENTRY(AND,     alu_JJd),				// 0111 0110
-		ENTRY(INVALID, dummy),					// 0111 0111
-		ENTRY(ADD,     alu_JJJd),				// 0111 1000
-		ENTRY(INVALID, dummy),					// 0111 1001
-		ENTRY(INVALID, dummy),					// 0111 1010
-		ENTRY(INVALID, dummy),					// 0111 1011
-		ENTRY(INVALID, dummy),					// 0111 1100
-		ENTRY(INVALID, dummy),					// 0111 1101
-		ENTRY(AND,     alu_JJd),				// 0111 1110
-		ENTRY(INVALID, dummy),					// 0111 1111
-
-		// 8x
-		ENTRY(INVALID, dummy),					// 1000 0000
-		ENTRY(INVALID, dummy),					// 1000 0001
-		ENTRY(INVALID, dummy),					// 1000 0010
-		ENTRY(INVALID, dummy),					// 1000 0011
-		ENTRY(INVALID, dummy),					// 1000 0100
-		ENTRY(INVALID, dummy),					// 1000 0101
-		ENTRY(INVALID, dummy),					// 1000 0110
-		ENTRY(INVALID, dummy),					// 1000 0111
-		ENTRY(INVALID, dummy),					// 1000 1000
-		ENTRY(INVALID, dummy),					// 1000 1001
-		ENTRY(INVALID, dummy),					// 1000 1010
-		ENTRY(INVALID, dummy),					// 1000 1011
-		ENTRY(INVALID, dummy),					// 1000 1100
-		ENTRY(INVALID, dummy),					// 1000 1101
-		ENTRY(INVALID, dummy),					// 1000 1110
-		ENTRY(INVALID, dummy),					// 1000 1111
-
-		// 9x
-		ENTRY(INVALID, dummy),					// 1001 0000
-		ENTRY(INVALID, dummy),					// 1001 0001
-		ENTRY(INVALID, dummy),					// 1001 0010
-		ENTRY(INVALID, dummy),					// 1001 0011
-		ENTRY(INVALID, dummy),					// 1001 0100
-		ENTRY(INVALID, dummy),					// 1001 0101
-		ENTRY(INVALID, dummy),					// 1001 0110
-		ENTRY(INVALID, dummy),					// 1001 0111
-		ENTRY(INVALID, dummy),					// 1001 1000
-		ENTRY(INVALID, dummy),					// 1001 1001
-		ENTRY(INVALID, dummy),					// 1001 1010
-		ENTRY(INVALID, dummy),					// 1001 1011
-		ENTRY(INVALID, dummy),					// 1001 1100
-		ENTRY(INVALID, dummy),					// 1001 1101
-		ENTRY(INVALID, dummy),					// 1001 1110
-		ENTRY(INVALID, dummy),					// 1001 1111
-
-		// Ax
-		ENTRY(INVALID, dummy),					// 1010 0000
-		ENTRY(INVALID, dummy),					// 1010 0001
-		ENTRY(INVALID, dummy),					// 1010 0010
-		ENTRY(INVALID, dummy),					// 1010 0011
-		ENTRY(INVALID, dummy),					// 1010 0100
-		ENTRY(INVALID, dummy),					// 1010 0101
-		ENTRY(INVALID, dummy),					// 1010 0110
-		ENTRY(INVALID, dummy),					// 1010 0111
-		ENTRY(INVALID, dummy),					// 1010 1000
-		ENTRY(INVALID, dummy),					// 1010 1001
-		ENTRY(INVALID, dummy),					// 1010 1010
-		ENTRY(INVALID, dummy),					// 1010 1011
-		ENTRY(INVALID, dummy),					// 1010 1100
-		ENTRY(INVALID, dummy),					// 1010 1101
-		ENTRY(INVALID, dummy),					// 1010 1110
-		ENTRY(INVALID, dummy),					// 1010 1111
-
-		// Bx
-		ENTRY(INVALID, dummy),					// 1011 0000
-		ENTRY(INVALID, dummy),					// 1011 0001
-		ENTRY(INVALID, dummy),					// 1011 0010
-		ENTRY(INVALID, dummy),					// 1011 0011
-		ENTRY(INVALID, dummy),					// 1011 0100
-		ENTRY(INVALID, dummy),					// 1011 0101
-		ENTRY(INVALID, dummy),					// 1011 0110
-		ENTRY(INVALID, dummy),					// 1011 0111
-		ENTRY(INVALID, dummy),					// 1011 1000
-		ENTRY(INVALID, dummy),					// 1011 1001
-		ENTRY(INVALID, dummy),					// 1011 1010
-		ENTRY(INVALID, dummy),					// 1011 1011
-		ENTRY(INVALID, dummy),					// 1011 1100
-		ENTRY(INVALID, dummy),					// 1011 1101
-		ENTRY(INVALID, dummy),					// 1011 1110
-		ENTRY(INVALID, dummy),					// 1011 1111
-
-		// Cx
-		ENTRY(INVALID, dummy),					// 1100 0000
-		ENTRY(INVALID, dummy),					// 1100 0001
-		ENTRY(INVALID, dummy),					// 1100 0010
-		ENTRY(INVALID, dummy),					// 1100 0011
-		ENTRY(INVALID, dummy),					// 1100 0100
-		ENTRY(INVALID, dummy),					// 1100 0101
-		ENTRY(INVALID, dummy),					// 1100 0110
-		ENTRY(INVALID, dummy),					// 1100 0111
-		ENTRY(INVALID, dummy),					// 1100 1000
-		ENTRY(INVALID, dummy),					// 1100 1001
-		ENTRY(INVALID, dummy),					// 1100 1010
-		ENTRY(INVALID, dummy),					// 1100 1011
-		ENTRY(INVALID, dummy),					// 1100 1100
-		ENTRY(INVALID, dummy),					// 1100 1101
-		ENTRY(INVALID, dummy),					// 1100 1110
-		ENTRY(INVALID, dummy),					// 1100 1111
-
-		// Dx
-		ENTRY(INVALID, dummy),					// 1101 0000
-		ENTRY(INVALID, dummy),					// 1101 0001
-		ENTRY(INVALID, dummy),					// 1101 0010
-		ENTRY(INVALID, dummy),					// 1101 0011
-		ENTRY(INVALID, dummy),					// 1101 0100
-		ENTRY(INVALID, dummy),					// 1101 0101
-		ENTRY(INVALID, dummy),					// 1101 0110
-		ENTRY(INVALID, dummy),					// 1101 0111
-		ENTRY(INVALID, dummy),					// 1101 1000
-		ENTRY(INVALID, dummy),					// 1101 1001
-		ENTRY(INVALID, dummy),					// 1101 1010
-		ENTRY(INVALID, dummy),					// 1101 1011
-		ENTRY(INVALID, dummy),					// 1101 1100
-		ENTRY(INVALID, dummy),					// 1101 1101
-		ENTRY(INVALID, dummy),					// 1101 1110
-		ENTRY(INVALID, dummy),					// 1101 1111
-
-		// Ex
-		ENTRY(INVALID, dummy),					// 1110 0000
-		ENTRY(INVALID, dummy),					// 1110 0001
-		ENTRY(INVALID, dummy),					// 1110 0010
-		ENTRY(INVALID, dummy),					// 1110 0011
-		ENTRY(INVALID, dummy),					// 1110 0100
-		ENTRY(INVALID, dummy),					// 1110 0101
-		ENTRY(INVALID, dummy),					// 1110 0110
-		ENTRY(INVALID, dummy),					// 1110 0111
-		ENTRY(INVALID, dummy),					// 1110 1000
-		ENTRY(INVALID, dummy),					// 1110 1001
-		ENTRY(INVALID, dummy),					// 1110 1010
-		ENTRY(INVALID, dummy),					// 1110 1011
-		ENTRY(INVALID, dummy),					// 1110 1100
-		ENTRY(INVALID, dummy),					// 1110 1101
-		ENTRY(INVALID, dummy),					// 1110 1110
-		ENTRY(INVALID, dummy),					// 1110 1111
-
-		// Fx
-		ENTRY(INVALID, dummy),					// 1111 0000
-		ENTRY(INVALID, dummy),					// 1111 0001
-		ENTRY(INVALID, dummy),					// 1111 0010
-		ENTRY(INVALID, dummy),					// 1111 0011
-		ENTRY(INVALID, dummy),					// 1111 0100
-		ENTRY(INVALID, dummy),					// 1111 0101
-		ENTRY(INVALID, dummy),					// 1111 0110
-		ENTRY(INVALID, dummy),					// 1111 0111
-		ENTRY(INVALID, dummy),					// 1111 1000
-		ENTRY(INVALID, dummy),					// 1111 1001
-		ENTRY(INVALID, dummy),					// 1111 1010
-		ENTRY(INVALID, dummy),					// 1111 1011
-		ENTRY(INVALID, dummy),					// 1111 1100
-		ENTRY(INVALID, dummy),					// 1111 1101
-		ENTRY(INVALID, dummy),					// 1111 1110
-		ENTRY(INVALID, dummy),					// 1111 1111
-	};
-
 	int decode_pm(instruction& inst, uint32_t header, const decode_settings& settings, buffer_reader& buf)
 	{
 		// Main instruction type is stored in the lower 8 bits
 		uint8_t base_type = inst.header & 0xff;
-		const op_entry& entry = pm_entries[base_type];
+		const pmove_entry& entry = g_pmove_entries[base_type];
 		inst.opcode = entry.opcode;
 		inst.word_count = 1;		// default values
-		int ret = entry.func(inst, header, settings, buf);
+		inst.neg_operands = entry.neg;
+		if (entry.regs[0] != Reg::NONE)
+			set_reg(inst.operands[0], entry.regs[0]);
+		if (entry.regs[1] != Reg::NONE)
+			set_reg(inst.operands[1], entry.regs[1]);
+		if (entry.regs[2] != Reg::NONE)
+			set_reg(inst.operands[2], entry.regs[2]);
+		int ret = decode_pmove(inst, header, settings, buf);
 		return ret;
 	}
 
 	// ========================================================================
 	//	NON-PARALLEL MOVE OPCODE FUNCTIONS
 	// ========================================================================
+	static int dummy(instruction& inst, uint32_t header, const decode_settings&, buffer_reader& buf)
+	{
+		return 1;
+	}
 
 	static int andi(instruction& inst, uint32_t header, const decode_settings& settings, buffer_reader& buf)
 	{
@@ -1057,7 +731,6 @@ namespace hop56
 		uint8_t base_type = (inst.header >> 12) & 0xfc;
 		base_type |= (inst.header >> 6) & 0x2;
 		base_type |= (inst.header >> 5) & 0x1;
-		printf("non-pm base_type: %b\n", base_type);
 		const op_entry& entry = non_pm_entries[base_type];
 		inst.opcode = entry.opcode;
 		inst.word_count = 1;		// default values
@@ -1074,6 +747,7 @@ namespace hop56
 		if (buf.read_word(inst.header))
 			return 1;
 
+		//printf("%04x -> %06x\n", buf.get_pos(), inst.header);
 		uint32_t top_bits = (inst.header >> 20) & 0xffff;
 		int ret = 0;
 		if (top_bits == 0x0)
