@@ -240,6 +240,7 @@ int main(int argc, char** argv)
 	fclose(pInfile);
 	if (readBytes != size)
 	{
+		free(data_ptr);
 		fprintf(stderr, "Error: Failed to read file contents\n");
 		return 1;
 	}
