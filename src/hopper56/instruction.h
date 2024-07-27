@@ -2,7 +2,7 @@
 #define HOPPER_56_INSTRUCTION_H
 #include <cstdint>
 
-namespace hopper56
+namespace hop56
 {
 	enum Reg
 	{

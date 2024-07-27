@@ -1,7 +1,7 @@
 #ifndef HOPPER56_DECODE_H
 #define HOPPER56_DECODE_H
 
-namespace hopper56
+namespace hop56
 {
 	struct instruction;
 	struct buffer_reader;

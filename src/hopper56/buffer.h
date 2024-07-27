@@ -3,7 +3,7 @@
 
 #include <cstdint>
 
-namespace hopper56
+namespace hop56
 {
 // ----------------------------------------------------------------------------
 // Bounded access to a range of memory

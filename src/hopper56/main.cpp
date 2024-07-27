@@ -11,7 +11,7 @@
 #include "instruction.h"
 
 
-#define REGNAME		hopper56::get_register_string
+#define REGNAME		hop56::get_register_string
 
 // ----------------------------------------------------------------------------
 // User options for output.
@@ -33,59 +33,59 @@ public:
 	struct line
 	{
 		uint32_t address;
-		hopper56::instruction inst;
+		hop56::instruction inst;
 	};
 
 	std::vector<line>    lines;
 };
 
 // Print an operand, for all operand types
-void print(const hopper56::operand& operand, FILE* pOutput)
+void print(const hop56::operand& operand, FILE* pOutput)
 {
-	fprintf(pOutput, "%s", hopper56::get_memory_string(operand.memory));
-	switch (operand.type) 
+	fprintf(pOutput, "%s", hop56::get_memory_string(operand.memory));
+	switch (operand.type)
 	{
-		case hopper56::operand::IMM_SHORT:
+		case hop56::operand::IMM_SHORT:
 			fprintf(pOutput, "#%d", operand.imm_short.val);
 			break;
-		case hopper56::operand::REG:
+		case hop56::operand::REG:
 			fprintf(pOutput, "%s",
 					REGNAME(operand.reg.index));
 			break;
-		case hopper56::operand::POSTDEC_OFFSET:
+		case hop56::operand::POSTDEC_OFFSET:
 			fprintf(pOutput, "(%s)-%s",
 					REGNAME(operand.postdec_offset.index_1),
 					REGNAME(operand.postdec_offset.index_2));
 			break;
-		case hopper56::operand::POSTINC_OFFSET:
+		case hop56::operand::POSTINC_OFFSET:
 			fprintf(pOutput, "(%s)+%s",
 					REGNAME(operand.postinc_offset.index_1),
 					REGNAME(operand.postinc_offset.index_2));
 			break;
-		case hopper56::operand::POSTDEC:
+		case hop56::operand::POSTDEC:
 			fprintf(pOutput, "(%s)-",
 					REGNAME(operand.postdec.index));
 			break;
-		case hopper56::operand::POSTINC:
+		case hop56::operand::POSTINC:
 			fprintf(pOutput, "(%s)+",
 					REGNAME(operand.postinc.index));
 			break;
-		case hopper56::operand::NO_UPDATE:
+		case hop56::operand::NO_UPDATE:
 			fprintf(pOutput, "(%s)",
 					REGNAME(operand.no_update.index));
 			break;
-		case hopper56::operand::INDEX_OFFSET:
+		case hop56::operand::INDEX_OFFSET:
 			fprintf(pOutput, "(%s+%s)",
 					REGNAME(operand.index_offset.index_1),
 					REGNAME(operand.index_offset.index_2));
 			break;
-		case hopper56::operand::PREDEC:
+		case hop56::operand::PREDEC:
 			fprintf(pOutput, "-(%s)", REGNAME(operand.predec.index));
 			break;
-		case hopper56::operand::ABS:
+		case hop56::operand::ABS:
 			fprintf(pOutput, "$%X", operand.abs.address);
 			break;
-		case hopper56::operand::IMM:
+		case hop56::operand::IMM:
 			fprintf(pOutput, "#$%X", operand.imm.val);
 			break;
 		default:
@@ -93,33 +93,33 @@ void print(const hopper56::operand& operand, FILE* pOutput)
 			break;
 	}
 }
-		
-int print(const hopper56::instruction& inst, uint32_t address, FILE* pOutput)
+
+int print(const hop56::instruction& inst, uint32_t address, FILE* pOutput)
 {
-	fprintf(pOutput, "%s\t", hopper56::get_opcode_string(inst.opcode));
+	fprintf(pOutput, "%s\t", hop56::get_opcode_string(inst.opcode));
 
 	for (int i = 0; i < 3; ++i)
 	{
-		const hopper56::operand& op = inst.operands[i];
-		if (op.type == hopper56::operand::NONE)
+		const hop56::operand& op = inst.operands[i];
+		if (op.type == hop56::operand::NONE)
 			break;
-	
+
 		if (i > 0)
 			fprintf(pOutput, ",");
-		
+
 		print(op, pOutput);
 	}
 
 	for (int i = 0; i < 2; ++i)
 	{
-		const hopper56::pmove& pmove = inst.pmoves[i];
-		if (pmove.operands[0].type == hopper56::operand::NONE)
+		const hop56::pmove& pmove = inst.pmoves[i];
+		if (pmove.operands[0].type == hop56::operand::NONE)
 			continue;	// skip if there is no first operand
-	
+
 		fprintf(pOutput, "\t");
 		print(pmove.operands[0], pOutput);
 
-		if (pmove.operands[1].type == hopper56::operand::NONE)
+		if (pmove.operands[1].type == hop56::operand::NONE)
 			continue;	// next pmove
 		fprintf(pOutput, ",");
 		print(pmove.operands[1], pOutput);
@@ -134,7 +134,7 @@ int print(const disassembly& disasm, const output_settings& osettings, FILE* pOu
 	for (size_t i = 0; i < disasm.lines.size(); ++i)
 	{
 		const disassembly::line& line = disasm.lines[i];
-		const hopper56::instruction& inst = line.inst;
+		const hop56::instruction& inst = line.inst;
 		if (osettings.show_address)
 		{
 			fprintf(pOutput, ">> %04x:   $%06x ", line.address, line.inst.header);
@@ -148,7 +148,7 @@ int print(const disassembly& disasm, const output_settings& osettings, FILE* pOu
 
 // ----------------------------------------------------------------------------
 // Read the buffer in a simple single pass.
-int decode_buf(hopper56::buffer_reader& buf, const hopper56::decode_settings& dsettings, disassembly& disasm)
+int decode_buf(hop56::buffer_reader& buf, const hop56::decode_settings& dsettings, disassembly& disasm)
 {
 	while (buf.get_remain() >= 1)
 	{
@@ -156,11 +156,11 @@ int decode_buf(hopper56::buffer_reader& buf, const hopper56::decode_settings& ds
 		line.address = buf.get_pos();
 
 		// decode uses a copy of the buffer state
-		hopper56::buffer_reader buf_copy(buf);
+		hop56::buffer_reader buf_copy(buf);
 
 		// We can ignore the return code, since it just says "this instruction is valid"
 		// rather than "something catastrophic happened"
-		hopper56::decode(line.inst, buf_copy, dsettings);
+		hop56::decode(line.inst, buf_copy, dsettings);
 
 		// Handle failure
 		disasm.lines.push_back(line);
@@ -176,10 +176,10 @@ int decode_buf(hopper56::buffer_reader& buf, const hopper56::decode_settings& ds
 }
 
 // ----------------------------------------------------------------------------
-int process_bin_file(const uint8_t* data_ptr, long size, const hopper56::decode_settings& dsettings, 
+int process_bin_file(const uint8_t* data_ptr, long size, const hop56::decode_settings& dsettings,
 		const output_settings& osettings, FILE* pOutput)
 {
-	hopper56::buffer_reader buf(data_ptr, size, 0);
+	hop56::buffer_reader buf(data_ptr, size, 0);
 	//symbols bin_symbols;
 
 	disassembly disasm;
@@ -208,8 +208,8 @@ int main(int argc, char** argv)
 	osettings.label_prefix = "L";
 	osettings.label_start_id = 0;
 
-	hopper56::decode_settings dsettings = {};
-	//dsettings.cpu_type = hopper56::CPU_TYPE_68000;
+	hop56::decode_settings dsettings = {};
+	//dsettings.cpu_type = hop56::CPU_TYPE_68000;
 	const int last_arg = argc - 1;							// last arg is reserved for filename or hex data.
 
 	for (int opt = 1; opt < last_arg; ++opt)

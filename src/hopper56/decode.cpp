@@ -5,7 +5,7 @@
 #include "instruction.h"
 #define ENTRY(opcode, func)		{ instruction::Opcode::opcode, func }
 
-namespace hopper56
+namespace hop56
 {
 	// Converts bit IDs in the parallel moves, to full register IDs
 	static Reg pmove_registers_1[32] =
@@ -141,7 +141,7 @@ namespace hopper56
 					op.memory = Memory::MEM_NONE;
 					return 0;
 				}
-				else if ((rrr == 0x0) && 
+				else if ((rrr == 0x0) &&
 							((mode == EA_MODE_ALL) ||
 							 (mode == EA_MODE_WRITE) ||
 							 (mode == EA_MODE_MOVEL)))
@@ -186,7 +186,7 @@ namespace hopper56
 		// Pre-choose modes and registers
 		uint32_t mmm = (pdata >> 3) & 0x7;
 		uint32_t rrr = (pdata >> 0) & 0x7;
-		
+
 		// Prep the most commonly-used operand slots/arguments
 		operand& op0 = inst.pmoves[0].operands[0];
 		operand& op1 = inst.pmoves[0].operands[1];
@@ -206,7 +206,7 @@ namespace hopper56
 				case 2: set_postdec(op0, rrr); break;
 				case 3: set_postinc(op0, rrr); break;
 			}
-			return 0;			
+			return 0;
 		}
 		if ((pdata & 0xf440) == 0x4040)
 		{
@@ -218,7 +218,7 @@ namespace hopper56
 			uint32_t LLL = ((pdata >> 8) & 0x3) | ((pdata >> 9) & 0x4);
 			set_reg(*opB, pmove_registers_movel[LLL]);
 			return decode_mmmrrr(*opA, MEM_L, mmm, rrr, EA_MODE_MOVEL, buf);
-		}	
+		}
 		if ((pdata & 0xf040) == 0x1000)
 		{
 			// X: Memory and Reg Move, Class I
@@ -332,7 +332,7 @@ namespace hopper56
 			return 0;
 		}
 		if ((pdata & 0xe000) == 0x2000)
-		{	
+		{
 			// Immediate short data move
 			uint32_t imdata = (pdata & 0xff);
 			uint32_t imreg = (pdata >> 8) & 0x1f;
@@ -384,7 +384,7 @@ namespace hopper56
 		inst.operands[0].reg.index = a_or_b ? Reg::B : Reg::A;
 		return decode_pmove(inst, header, settings, buf);
 	}
-	
+
 	static int adc(instruction& inst, uint32_t header, const decode_settings& settings, buffer_reader& buf)
 	{
 		uint32_t x_or_y = (header >> 4) & 1;
@@ -400,9 +400,9 @@ namespace hopper56
 		uint32_t d = (header >> 4) & 0x1;
 		static Reg sources[16] =
 		{
-			Reg::NONE, Reg::NONE, Reg::B,  Reg::A,  Reg::X,  Reg::X,  Reg::Y,  Reg::Y, 
+			Reg::NONE, Reg::NONE, Reg::B,  Reg::A,  Reg::X,  Reg::X,  Reg::Y,  Reg::Y,
 			Reg::X0,   Reg::X0,   Reg::Y0, Reg::Y0, Reg::X1, Reg::X1, Reg::Y1, Reg::Y1
-		};	
+		};
 		set_reg(inst.operands[0], sources[JJJd]);
 		set_reg(inst.operands[1], d ? Reg::B : Reg::A);
 		if (sources[JJJd] == Reg::NONE)
@@ -419,7 +419,7 @@ namespace hopper56
 		set_reg(inst.operands[1], d ? Reg::B : Reg::A);
 		return decode_pmove(inst, header, settings, buf);
 	}
-	
+
 	static int addl(instruction& inst, uint32_t header, const decode_settings& settings, buffer_reader& buf)
 	{
 		uint32_t d = (header >> 3) & 0x1;
@@ -755,7 +755,7 @@ namespace hopper56
 		set_imm_short(inst.operands[0], bbbbb);
 		return decode_mmmrrr(inst.operands[1], S ? MEM_Y : MEM_X, mmm, rrr, EA_MODE_WRITE, buf);
 	}
-	
+
 	// ========================================================================
 	//	OPCODE TABLE FOR NON-PARALLEL MOVE INSTRUCTIONS
 	// ========================================================================
@@ -1048,12 +1048,12 @@ namespace hopper56
 		ENTRY(INVALID, dummy),					// 1111 1101
 		ENTRY(INVALID, dummy),					// 1111 1110
 		ENTRY(INVALID, dummy),					// 1111 1111
-	};	
+	};
 
 	int decode_non_pm(instruction& inst, uint32_t header, const decode_settings& settings, buffer_reader& buf)
 	{
 		// 6 bits from 14 onwards, bit 7, bit 5
-		// form an 8-bit word from that 
+		// form an 8-bit word from that
 		uint8_t base_type = (inst.header >> 12) & 0xfc;
 		base_type |= (inst.header >> 6) & 0x2;
 		base_type |= (inst.header >> 5) & 0x1;
@@ -1061,7 +1061,7 @@ namespace hopper56
 		const op_entry& entry = non_pm_entries[base_type];
 		inst.opcode = entry.opcode;
 		inst.word_count = 1;		// default values
-		
+
 		int ret = entry.func(inst, inst.header, settings, buf);
 		return ret;
 	}
