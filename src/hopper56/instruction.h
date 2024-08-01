@@ -1,6 +1,7 @@
 #ifndef HOPPER_56_INSTRUCTION_H
 #define HOPPER_56_INSTRUCTION_H
 #include <cstdint>
+#include "opcode.h"
 
 namespace hop56
 {
@@ -25,6 +26,8 @@ namespace hop56
 		A10, B10, AB, BA,
 
 		MR, CCR, OMR,
+
+		SR, SP, SSH, SSL, LA, LC,
 		REG_COUNT
 	};
 
@@ -54,7 +57,9 @@ namespace hop56
 			NO_UPDATE = 8,			// (Rn)
 			PREDEC = 9,				// -(Rn)
 			ABS = 10,				// absolute address
-			IMM = 11,				// full-word immediate
+			ABS_SHORT = 11,			// absolute address short
+			IMM = 12,				// full-word immediate
+			IO_SHORT = 13,			// I/O short absolute address
 		};
 		Memory memory;				// X/Y/P/None
 		Type type;
@@ -87,6 +92,17 @@ namespace hop56
 			{
 				uint32_t address;
 			} abs;
+
+			struct
+			{
+				uint32_t address;
+			} abs_short;
+
+			struct
+			{
+				uint16_t address;
+			} io_short;
+
 		};
 
 		void reset() 		{ memory = MEM_NONE; type = NONE; }
@@ -102,100 +118,6 @@ namespace hop56
 
 	struct instruction
 	{
-		enum Opcode
-		{
-			INVALID = 0,
-			ABS,
-			ADC,
-			ADD,
-			ADDL,
-			ADDR,
-			AND,
-			ANDI,
-			ASL,
-			ASL4,
-			ASR,
-			ASR16,
-			ASR4,
-			BCHG,
-			BCLR,
-			BSET,
-			BTSTH,
-			BTSTL,
-			BRA,
-			BRKcc,
-			BSR,
-			BScc,
-			Bcc,
-			CLR,
-			CLR24,
-			CMP,
-			CMPM,
-			DE_BUG,
-			DEBUGcc,
-			DEC,
-			DEC24,
-			DIV,
-			DMAC,
-			DO,
-			DOLoop,
-			ENDDO,
-			EOR,
-			EXT,
-			FOREVER,
-			IMAC,
-			IMPY,
-			INC,
-			INC24,
-			JMP,
-			JSR,
-			JScc,
-			Jcc,
-			LEA,
-			LSL,
-			LSR,
-			MAC,
-			MACR,
-			MOVE,
-			MOVEC,
-			MOVEI,
-			MOVEM,
-			MOVEP,
-			MOVES,
-			MPY,
-			MPYR,
-			NEG,
-			NEGC,
-			NOP,
-			NORM,
-			NOT,
-			OR,
-			ORI,
-			REP,
-			REPc,
-			RESET,
-			RND,
-			ROL,
-			ROR,
-			RTI,
-			RTS,
-			SBC,
-			STOP,
-			SUB,
-			SUBL,
-			SUBR,
-			SWAP,
-			SWI,
-			TFR,
-			TFR2,
-			TST,
-			TST2,
-			Tcc,
-			WAIT,
-			ZERO,
-			OPCODE_COUNT
-		};
-
 		instruction();
 		void reset();
 
@@ -206,12 +128,13 @@ namespace hop56
 		Opcode opcode;
 		int neg_operands;		// if !=0, add "-" to the operands
 		operand operands[3];
+		operand operands2[3];	// extra register pair for Tcc ops
 		pmove pmoves[2];
 	};
 
 	// ----------------------------------------------------------------------------
 	// Helper functions to convert parts of the instruction to strings.
-	extern const char* get_opcode_string(instruction::Opcode opcode);
+	extern const char* get_opcode_string(Opcode opcode);
 	extern const char* get_register_string(Reg reg);
 	extern const char* get_memory_string(Memory mem);
 }

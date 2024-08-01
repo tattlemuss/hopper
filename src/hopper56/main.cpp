@@ -83,10 +83,16 @@ void print(const hop56::operand& operand, FILE* pOutput)
 			fprintf(pOutput, "-(%s)", REGNAME(operand.predec.index));
 			break;
 		case hop56::operand::ABS:
-			fprintf(pOutput, "$%X", operand.abs.address);
+			fprintf(pOutput, "$%x", operand.abs.address);
+			break;
+		case hop56::operand::ABS_SHORT:
+			fprintf(pOutput, ">$%x", operand.abs_short.address);
 			break;
 		case hop56::operand::IMM:
-			fprintf(pOutput, "#$%X", operand.imm.val);
+			fprintf(pOutput, "#$%x", operand.imm.val);
+			break;
+		case hop56::operand::IO_SHORT:
+			fprintf(pOutput, "<<$%x", operand.io_short.address);
 			break;
 		default:
 			fprintf(pOutput, "unknown %d?", operand.type);
@@ -96,18 +102,40 @@ void print(const hop56::operand& operand, FILE* pOutput)
 
 int print(const hop56::instruction& inst, uint32_t address, FILE* pOutput)
 {
-	fprintf(pOutput, "%s\t", hop56::get_opcode_string(inst.opcode));
+	if (inst.opcode == hop56::INVALID)
+	{
+		fprintf(pOutput, "DC\t$%06x", inst.header);
+		return 0;
+	}
 
-	if (inst.neg_operands)
-		fprintf(pOutput, "-");
-
+	fprintf(pOutput, "%s", hop56::get_opcode_string(inst.opcode));
 	for (int i = 0; i < 3; ++i)
 	{
 		const hop56::operand& op = inst.operands[i];
 		if (op.type == hop56::operand::NONE)
 			break;
 
-		if (i > 0)
+		if (i == 0)
+		{
+			fprintf(pOutput, "\t");
+			if (inst.neg_operands)
+				fprintf(pOutput, "-");
+		}
+		else
+			fprintf(pOutput, ",");
+
+		print(op, pOutput);
+	}
+
+	for (int i = 0; i < 2; ++i)
+	{
+		const hop56::operand& op = inst.operands2[i];
+		if (op.type == hop56::operand::NONE)
+			break;
+
+		if (i == 0)
+			fprintf(pOutput, "\t");
+		else
 			fprintf(pOutput, ",");
 
 		print(op, pOutput);
@@ -120,8 +148,6 @@ int print(const hop56::instruction& inst, uint32_t address, FILE* pOutput)
 			continue;	// skip if there is no first operand
 
 		fprintf(pOutput, "\t");
-		assert(!inst.neg_operands);
-
 		print(pmove.operands[0], pOutput);
 
 		if (pmove.operands[1].type == hop56::operand::NONE)
@@ -166,14 +192,14 @@ int decode_buf(hop56::buffer_reader& buf, const hop56::decode_settings& dsetting
 		// We can ignore the return code, since it just says "this instruction is valid"
 		// rather than "something catastrophic happened"
 		hop56::decode(line.inst, buf_copy, dsettings);
+		printf("\n>>> %06x\t", line.inst.header);
 
 		// Handle failure
 		disasm.lines.push_back(line);
 
 		// DEBUG
-		//printf("%06x\t", line.inst.header);
-		//print(line.inst, line.address, stdout);
-		//printf("\n");
+		print(line.inst, line.address, stdout);
+		printf("\n");
 
 		buf.advance(line.inst.word_count);
 	}

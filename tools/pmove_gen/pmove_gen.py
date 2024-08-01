@@ -18,7 +18,7 @@ def parse_code_line(str):
         str = str[:comment]
 
     parts = str.split("\t")
-    opcode = parts[0]
+    opcode = "O_" + parts[0]
 
     operands = parts[1]
     neg = 0
@@ -63,7 +63,7 @@ def run(asm_path, p56_path, output_path):
     table = {}
     empty_ops = ['NONE', 'NONE', 'NONE']
     # Special cases!
-    table[0] = ('MOVE', '', 0, empty_ops)
+    table[0] = ('O_MOVE', '', 0, empty_ops)
 
     while not r.eof():
         v = 0
