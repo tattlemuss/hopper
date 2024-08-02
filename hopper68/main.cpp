@@ -6,10 +6,10 @@
 #include <string>
 #include <cstring>
 
-#include "hopper68/buffer.h"
-#include "hopper68/decode.h"
-#include "hopper68/instruction.h"
-#include "hopper68/timing.h"
+#include "lib/buffer.h"
+#include "lib/decode.h"
+#include "lib/instruction.h"
+#include "lib/timing.h"
 #include "symbols.h"
 #include "print.h"
 
@@ -503,7 +503,7 @@ static int read_reloc(hopper68::buffer_reader& buf, line_numbers& lines)
 }
 
 // ----------------------------------------------------------------------------
-int process_tos_file(const uint8_t* data_ptr, long size, const hopper68::decode_settings& dsettings, 
+int process_tos_file(const uint8_t* data_ptr, long size, const hopper68::decode_settings& dsettings,
 		const output_settings& osettings, FILE* pOutput)
 {
 	hopper68::buffer_reader buf(data_ptr, size, 0);
@@ -569,7 +569,7 @@ int process_tos_file(const uint8_t* data_ptr, long size, const hopper68::decode_
 }
 
 // ----------------------------------------------------------------------------
-int process_bin_file(const uint8_t* data_ptr, long size, const hopper68::decode_settings& dsettings, 
+int process_bin_file(const uint8_t* data_ptr, long size, const hopper68::decode_settings& dsettings,
 		const output_settings& osettings, FILE* pOutput)
 {
 	hopper68::buffer_reader buf(data_ptr, size, 0);

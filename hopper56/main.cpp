@@ -6,9 +6,9 @@
 #include <string>
 #include <cstring>
 
-#include "buffer.h"
-#include "decode.h"
-#include "instruction.h"
+#include "lib/buffer.h"
+#include "lib/decode.h"
+#include "lib/instruction.h"
 
 
 #define REGNAME		hop56::get_register_string

@@ -1,6 +1,6 @@
 from typing import List, Set
 
-OUT_PATH = '../../hopper56'
+OUT_PATH = '../../hopper56/lib'
 lines = open("dsp56k.mch").readlines()
 
 class Code:

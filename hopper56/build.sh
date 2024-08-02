@@ -8,8 +8,8 @@ LDFLAGS="-lc"
 # lib code
 
 # Application code
-${CC} ${CFLAGS} -c -o decode.o      decode.cpp
-${CC} ${CFLAGS} -c -o instruction.o instruction.cpp
+${CC} ${CFLAGS} -c -o decode.o      lib/decode.cpp
+${CC} ${CFLAGS} -c -o instruction.o lib/instruction.cpp
 ${CC} ${CFLAGS} -c -o main.o        main.cpp
 
 ${LD} ${LDFLAGS} main.o decode.o instruction.o -o hopper56

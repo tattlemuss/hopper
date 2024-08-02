@@ -171,7 +171,7 @@ if __name__=='__main__':
     fh.close()
     results = parse(l)
 
-    fh = open("../hopper68/hopper68/timing_table.i", "w")
+    fh = open("../hopper68/lib/timing_table.i", "w")
     for r in results:
         fh.write(" TIMING(%5s,%8s,%s,%s,%d,%s),\n" % r)
     fh.close()

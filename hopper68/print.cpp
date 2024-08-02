@@ -3,7 +3,7 @@
 // representations that suit the use-case.
 #include "print.h"
 
-#include "hopper68/instruction.h"
+#include "lib/instruction.h"
 #include "symbols.h"
 
 // ----------------------------------------------------------------------------
@@ -118,7 +118,7 @@ static void insert_comma(LastOutput& last, FILE* pFile)
 }
 
 // ----------------------------------------------------------------------------
-static void print_indexed_68020(const hopper68::indirect_index_full& ref, const symbols& symbols, 
+static void print_indexed_68020(const hopper68::indirect_index_full& ref, const symbols& symbols,
 	int brace_open, int brace_close, uint32_t inst_address, FILE* pFile)
 {
 	fprintf(pFile, "(");

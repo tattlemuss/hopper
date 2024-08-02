@@ -7,7 +7,7 @@ if ! rmac -Fp -m56001 -DRMAC=1 -DMOT=0 dsp2.s -o dsp.p56; then
 fi
 tail -c +10 dsp.p56 > dsp2.p56
 
-../hopper56/hopper56 dsp2.p56 |more > test.txt
+../hopper56 dsp2.p56 |more > test.txt
 
 echo "****** diffs: ******"
 diff --ignore-all-space --ignore-blank-lines dsp2.s test.txt
