@@ -1,5 +1,4 @@
 #!/usr/bin/env sh
-SRC_PATH=.
 CC=g++
 LD=g++
 CFLAGS=" -DDEBUG -std=c++11 -g -Wall"
@@ -13,6 +12,7 @@ ${CC} ${CFLAGS} -c -o decode.o      decode.cpp
 ${CC} ${CFLAGS} -c -o instruction.o instruction.cpp
 ${CC} ${CFLAGS} -c -o main.o        main.cpp
 
-${LD} ${LDFLAGS} main.o decode.o instruction.o -o test
+${LD} ${LDFLAGS} main.o decode.o instruction.o -o hopper56
+
 
 
