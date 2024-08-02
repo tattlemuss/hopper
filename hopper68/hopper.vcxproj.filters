@@ -15,33 +15,42 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="lib\\decode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lib\\instruction.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lib\\timing.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="decode.cpp">
+    <ClCompile Include="print.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="symbols.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="timing.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="buffer.h">
+    <ClInclude Include="lib\\buffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="decode.h">
+    <ClInclude Include="lib\\decode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="instruction.h">
+    <ClInclude Include="lib\\instruction.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\\timing.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="symbols.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="timing.h">
+    <ClInclude Include="print.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -98,17 +98,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="decode.cpp" />
+    <ClCompile Include="lib\\decode.cpp" />
+    <ClCompile Include="lib\\instruction.cpp" />
+    <ClCompile Include="lib\\timing.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="print.cpp" />
     <ClCompile Include="symbols.cpp" />
-    <ClCompile Include="timing.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="buffer.h" />
-    <ClInclude Include="decode.h" />
-    <ClInclude Include="instruction.h" />
+    <ClInclude Include="lib\\buffer.h" />
+    <ClInclude Include="lib\\decode.h" />
+    <ClInclude Include="lib\\instruction.h" />
+    <ClInclude Include="lib\\timing.h" />
     <ClInclude Include="symbols.h" />
-    <ClInclude Include="timing.h" />
+    <ClInclude Include="print.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
