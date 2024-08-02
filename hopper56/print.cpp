@@ -6,11 +6,12 @@
 #include <cstring>
 
 #include "lib/instruction.h"
+#include "symbols.h"
 
 #define REGNAME		hop56::get_register_string
 
 // Print an operand, for all operand types
-static void print(const hop56::operand& operand, FILE* pOutput)
+static void print(const hop56::operand& operand, const symbols& symbols, FILE* pOutput)
 {
 	fprintf(pOutput, "%s", hop56::get_memory_string(operand.memory));
 	switch (operand.type)
@@ -53,7 +54,13 @@ static void print(const hop56::operand& operand, FILE* pOutput)
 			fprintf(pOutput, "-(%s)", REGNAME(operand.predec.index));
 			break;
 		case hop56::operand::ABS:
-			fprintf(pOutput, "$%x", operand.abs.address);
+		{
+			symbol sym;
+			if (find_symbol(symbols, hop56::Memory::MEM_P, operand.abs.address, sym))
+				fprintf(pOutput, "%s", sym.label.c_str());
+			else
+				fprintf(pOutput, "$%x", operand.abs.address);
+		}
 			break;
 		case hop56::operand::ABS_SHORT:
 			fprintf(pOutput, ">$%x", operand.abs_short.address);
@@ -70,7 +77,7 @@ static void print(const hop56::operand& operand, FILE* pOutput)
 	}
 }
 
-int print(const hop56::instruction& inst, uint32_t address, FILE* pOutput)
+int print(const hop56::instruction& inst, const symbols& symbols, uint32_t address, FILE* pOutput)
 {
 	if (inst.opcode == hop56::INVALID)
 	{
@@ -94,7 +101,7 @@ int print(const hop56::instruction& inst, uint32_t address, FILE* pOutput)
 		else
 			fprintf(pOutput, ",");
 
-		print(op, pOutput);
+		print(op, symbols, pOutput);
 	}
 
 	for (int i = 0; i < 2; ++i)
@@ -108,7 +115,7 @@ int print(const hop56::instruction& inst, uint32_t address, FILE* pOutput)
 		else
 			fprintf(pOutput, ",");
 
-		print(op, pOutput);
+		print(op, symbols, pOutput);
 	}
 
 	for (int i = 0; i < 2; ++i)
@@ -118,12 +125,12 @@ int print(const hop56::instruction& inst, uint32_t address, FILE* pOutput)
 			continue;	// skip if there is no first operand
 
 		fprintf(pOutput, "\t");
-		print(pmove.operands[0], pOutput);
+		print(pmove.operands[0], symbols, pOutput);
 
 		if (pmove.operands[1].type == hop56::operand::NONE)
 			continue;	// next pmove
 		fprintf(pOutput, ",");
-		print(pmove.operands[1], pOutput);
+		print(pmove.operands[1], symbols, pOutput);
 	}
 	return 0;
 }

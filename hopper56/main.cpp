@@ -9,6 +9,7 @@
 #include "lib/decode.h"
 #include "lib/instruction.h"
 #include "print.h"
+#include "symbols.h"
 
 #define REGNAME		hop56::get_register_string
 
@@ -40,18 +41,22 @@ public:
 
 // ----------------------------------------------------------------------------
 // Print a set of diassembled lines.
-int print(const disassembly& disasm, const output_settings& osettings, FILE* pOutput)
+int print(const disassembly& disasm, const output_settings& osettings, const symbols& symbols, FILE* pOutput)
 {
 	for (size_t i = 0; i < disasm.lines.size(); ++i)
 	{
 		const disassembly::line& line = disasm.lines[i];
 		const hop56::instruction& inst = line.inst;
+
+		symbol sym;
+		if (find_symbol(symbols, hop56::Memory::MEM_P, line.address, sym))
+			fprintf(pOutput, "%s:\n", sym.label.c_str());
+
 		if (osettings.show_address)
-		{
-			fprintf(pOutput, ">> %04x:   $%06x ", line.address, line.inst.header);
-		}
+			fprintf(pOutput, "P:$%04x:   $%06x ", line.address, line.inst.header);
+
 		fprintf(pOutput, "\t");
-		print(inst, line.address, pOutput);
+		print(inst, symbols, line.address, pOutput);
 		fprintf(pOutput, "\n");
 	}
 	return 0;
@@ -72,18 +77,81 @@ int decode_buf(hop56::buffer_reader& buf, const hop56::decode_settings& dsetting
 		// We can ignore the return code, since it just says "this instruction is valid"
 		// rather than "something catastrophic happened"
 		hop56::decode(line.inst, buf_copy, dsettings);
-		printf("\n>>> %06x\t", line.inst.header);
+		//printf("\n>>> %06x\t", line.inst.header);
 
 		// Handle failure
 		disasm.lines.push_back(line);
 
 		// DEBUG
-		print(line.inst, line.address, stdout);
-		printf("\n");
+		//print(line.inst, line.address, stdout);
+		//printf("\n");
 
 		buf.advance(line.inst.word_count);
 	}
 	return 0;
+}
+
+// Check if an operand jumps to another known address, and return that address
+bool get_address(const hop56::operand& op, uint32_t inst_address, symbol::addr_t& target_address)
+{
+	if (op.type == hop56::operand::ABS)
+	{
+		// Ignore X: and Y: refs
+		if (op.memory == hop56::MEM_P || op.memory == hop56::MEM_NONE)
+		{
+			// Force to P: memory
+			target_address.mem = hop56::MEM_P;
+			target_address.addr = op.abs.address;
+			return true;
+		}
+	}
+	return false;
+}
+
+// ----------------------------------------------------------------------------
+// Find addresses referenced by disasm instructions and add them to the
+// symbol table
+void add_reference_symbols(const disassembly& disasm, const output_settings& settings, symbols& symbols)
+{
+	uint32_t label_id = settings.label_start_id;
+	symbol::addr_t target_address;
+	symbol sym;
+	for (size_t i = 0; i < disasm.lines.size(); ++i)
+	{
+		const disassembly::line& line = disasm.lines[i];
+		const hop56::instruction& inst = line.inst;
+		for (size_t o = 0; o < 3; ++o)
+		{
+			const hop56::operand& op = inst.operands[o];
+			if (get_address(op, line.address, target_address))
+			{
+				if (!find_symbol(symbols, hop56::Memory::MEM_P, target_address.addr, sym))
+				{
+					sym.label = settings.label_prefix + std::to_string(label_id);
+					add_symbol(symbols, target_address.mem, target_address.addr, sym);
+					++label_id;
+				}
+			}
+		}
+
+		// Now check pmoves
+		for (size_t pm = 0; pm < 2; ++pm)
+		{
+			for (size_t o = 0; o < 3; ++o)
+			{
+				const hop56::operand& op = inst.pmoves[pm].operands[o];
+				if (get_address(op, line.address, target_address))
+				{
+					if (!find_symbol(symbols, target_address.mem, target_address.addr, sym))
+					{
+						sym.label = settings.label_prefix + std::to_string(label_id);
+						add_symbol(symbols, target_address.mem, target_address.addr, sym);
+						++label_id;
+					}
+				}
+			}
+		}
+	}
 }
 
 // ----------------------------------------------------------------------------
@@ -91,15 +159,15 @@ int process_bin_file(const uint8_t* data_ptr, long size, const hop56::decode_set
 		const output_settings& osettings, FILE* pOutput)
 {
 	hop56::buffer_reader buf(data_ptr, size, 0);
-	//symbols bin_symbols;
+	symbols bin_symbols;
 
 	disassembly disasm;
 	if (decode_buf(buf, dsettings, disasm))
 		return 1;
 
-	//add_reference_symbols(disasm, osettings, bin_symbols);
+	add_reference_symbols(disasm, osettings, bin_symbols);
 
-	print(disasm, osettings, pOutput);
+	print(disasm, osettings, bin_symbols, pOutput);
 	return 0;
 }
 
@@ -120,7 +188,6 @@ int main(int argc, char** argv)
 	osettings.label_start_id = 0;
 
 	hop56::decode_settings dsettings = {};
-	//dsettings.cpu_type = hop56::CPU_TYPE_68000;
 	const int last_arg = argc - 1;							// last arg is reserved for filename or hex data.
 
 	for (int opt = 1; opt < last_arg; ++opt)
