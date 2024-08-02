@@ -1,5 +1,5 @@
-tests/*.txt
-tests/*.diff
-tests/*.bin
-tests/*.prg
+tests68/*.txt
+tests68/*.diff
+tests68/*.bin
+tests68/*.prg
 

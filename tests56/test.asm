@@ -570,9 +570,8 @@
 	movep	x:<<$ffe9,y:$12345
 	movep	x:<<$ffe9,omr
 
-
 	; Suspicious ggn tests
 	neg a	x:(r0),x0		y:(r4)+,y0
-	neg a	x:(r0)+n0,x0		y:(r4)-,y0
-	neg a	x:(r0)-,x0		y:(r4)+n4,y0
-	neg a	x:(r0)+,x0		y:(r4),y0
+	neg a	x:(r0)+n0,x0		y:(r5)-,y0
+	neg a	x:(r0)-,x0		y:(r6)+n6,y0
+	neg a	x:(r0)+,x0		y:(r7),y0

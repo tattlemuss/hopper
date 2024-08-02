@@ -12,11 +12,11 @@ vasmm68k_mot tst68030.s -m68030 -Ftos -o tst68030.prg
 # Disassemble and compare
 
 echo "test 68000"
-../src/bin/hopper tst68000.prg > tst68000.txt
+../hopper68/bin/hopper tst68000.prg > tst68000.txt
 echo "test 68020"
-../src/bin/hopper --m68020  tst68020.prg > tst68020.txt
+../hopper68/bin/hopper --m68020  tst68020.prg > tst68020.txt
 echo "test 68030"
-../src/bin/hopper --m68030  tst68030.prg > tst68030.txt
+../hopper68/bin/hopper --m68030  tst68030.prg > tst68030.txt
 echo "diffs"
 DIFF_OPTS="--ignore-blank-lines --ignore-all-space"
 
