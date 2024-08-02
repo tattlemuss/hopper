@@ -1,6 +1,5 @@
 #include "decode.h"
 
-#include <stdio.h>
 #include "buffer.h"
 #include "instruction.h"
 
@@ -379,7 +378,6 @@ namespace hop56
 			// Second pmove is always X0
 			H56CHECK(set_reg(inst.pmoves[1].operands[0], Reg::X0))
 			H56CHECK(set_reg(inst.pmoves[1].operands[1], accum_reg))
-			//printf("X Class II\n");
 			return 0;
 		}
 		if ((pdata & 0xfec0) == 0x0880)
@@ -396,7 +394,6 @@ namespace hop56
 			// Second pmove is always Y0
 			H56CHECK(set_reg(inst.pmoves[0].operands[0], Reg::Y0))
 		   	H56CHECK(set_reg(inst.pmoves[0].operands[1], accum_reg))
-			//printf("Y Class II\n");
 			return 0;
 		}
 		if ((pdata & 0xc840) == 0x4000)
@@ -1125,7 +1122,6 @@ namespace hop56
 	// Used in 100sw1mmmrrr1spppppp  O_MOVEP    'dsp_movep_ea MOVEP XY:ea,XY:pp'
 	static int decode_nonp_swmmmrrrspppppp(nonp_context& ctx, Opcode opcode)
 	{
-		//printf("___sw_mmmrrr_spppppp\n");
 		// Choose operand ordering
 		operand* opA, *opB;
 		uint32_t w = (ctx.inst.header >> 15) & 0x1;
@@ -1150,7 +1146,6 @@ namespace hop56
 	// Used in 100sw1mmmrrr01pppppp  O_MOVEP    'dsp_movep_ea MOVEP P:ea,XY:pp'
 	static int decode_nonp_swmmmrrrpppppp(nonp_context& ctx, Opcode opcode)
 	{
-		//printf("___sw_mmmrrr__pppppp\n");
 		// Choose operand ordering
 		operand* opA, *opB;
 		uint32_t w = (ctx.inst.header >> 15) & 0x1;
@@ -1175,7 +1170,6 @@ namespace hop56
 	// Used in 100sw1dddddd00pppppp  O_MOVEP    'dsp_movep_ea MOVEP REG,XY:pp'
 	static int decode_nonp_swddddddpppppp(nonp_context& ctx, Opcode opcode)
 	{
-		//printf("___sw_dddddd__pppppp\n");
 		// Choose operand ordering
 		operand* opA, *opB;
 		uint32_t w = (ctx.inst.header >> 15) & 0x1;
@@ -1220,10 +1214,6 @@ namespace hop56
 		nonp_context ctx(inst, buf, settings);
 		ctx.header = header;
 		inst.word_count = 1;		// default values
-
-		if (ctx.header == 0x08c17e)
-			printf("%X\n", ctx.header);
-
 		dsp_decoder func = g_nonp_tables[base_type];
 		int ret = func(ctx);
 		return ret;
