@@ -5,14 +5,15 @@ CFLAGS=" -DDEBUG -std=c++11 -g -Wall"
 LDFLAGS="-lc"
 
 # Just build everything -- this project isn't big
-# lib code
 
-# Application code
+# Library (decoder) cost
 ${CC} ${CFLAGS} -c -o decode.o      lib/decode.cpp
 ${CC} ${CFLAGS} -c -o instruction.o lib/instruction.cpp
+# Application code
 ${CC} ${CFLAGS} -c -o main.o        main.cpp
+${CC} ${CFLAGS} -c -o print.o       print.cpp
 
-${LD} ${LDFLAGS} main.o decode.o instruction.o -o hopper56
+${LD} ${LDFLAGS} main.o print.o decode.o instruction.o -o hopper56
 
 
 
