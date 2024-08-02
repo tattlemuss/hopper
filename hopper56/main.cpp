@@ -18,7 +18,7 @@
 struct output_settings
 {
 	bool show_address;			// print address for each line before opcode
-	bool show_timings;			// print (guessed) timings for each line (valid for 68000 only)
+	bool show_header;			// print hex header for each line before opcode
 	std::string label_prefix;	// prefix for all auto-labels, normally "L"
 	uint32_t label_start_id;	// starting number of label prefix, normally 0
 };
@@ -53,7 +53,9 @@ int print(const disassembly& disasm, const output_settings& osettings, const sym
 			fprintf(pOutput, "%s:\n", sym.label.c_str());
 
 		if (osettings.show_address)
-			fprintf(pOutput, "P:$%04x:   $%06x ", line.address, line.inst.header);
+			fprintf(pOutput, "P:$%04x:  ", line.address);
+		if (osettings.show_header)
+			fprintf(pOutput, "[%06x] ", line.inst.header);
 
 		fprintf(pOutput, "\t");
 		print(inst, symbols, line.address, pOutput);
@@ -77,14 +79,9 @@ int decode_buf(hop56::buffer_reader& buf, const hop56::decode_settings& dsetting
 		// We can ignore the return code, since it just says "this instruction is valid"
 		// rather than "something catastrophic happened"
 		hop56::decode(line.inst, buf_copy, dsettings);
-		//printf("\n>>> %06x\t", line.inst.header);
 
 		// Handle failure
 		disasm.lines.push_back(line);
-
-		// DEBUG
-		//print(line.inst, line.address, stdout);
-		//printf("\n");
 
 		buf.advance(line.inst.word_count);
 	}
@@ -183,7 +180,7 @@ int main(int argc, char** argv)
 
 	output_settings osettings = {};
 	osettings.show_address = false;
-	osettings.show_timings = false;
+	osettings.show_header = false;
 	osettings.label_prefix = "L";
 	osettings.label_start_id = 0;
 
@@ -194,6 +191,8 @@ int main(int argc, char** argv)
 	{
 		if (strcmp(argv[opt], "--address") == 0)
 			osettings.show_address = true;
+		if (strcmp(argv[opt], "--header") == 0)
+			osettings.show_header = true;
 	}
 
 	const char* fname = argv[argc - 1];
