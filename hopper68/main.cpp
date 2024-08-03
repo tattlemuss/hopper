@@ -680,8 +680,8 @@ enum DECODE_MODE
 // ----------------------------------------------------------------------------
 void usage()
 {
-	fprintf(stdout, "hopper\n\n"
-		"Usage: hopper [options] input_filename|hexstring\n\n"
+	fprintf(stdout, "hopper68\n\n"
+		"Usage: hopper68 [options] input_filename|hexstring\n\n"
 		"options:\n"
 		"\t--hex       Input argument is hex string rather than filename\n"
 		"\t--bin       Read binary file rather than .prg\n"
