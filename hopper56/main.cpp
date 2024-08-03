@@ -11,8 +11,6 @@
 #include "print.h"
 #include "symbols.h"
 
-#define REGNAME		hop56::get_register_string
-
 // ----------------------------------------------------------------------------
 // User options for output.
 struct output_settings
@@ -171,12 +169,26 @@ int process_bin_file(const uint8_t* data_ptr, long size, const hop56::decode_set
 }
 
 // ----------------------------------------------------------------------------
+void usage()
+{
+	fprintf(stdout, "hopper56\n\n"
+		"Usage: hopper56 [options] input_filename\n\n"
+		"options:\n"
+		"\t--header                 Show opcode hex header\n"
+		"\t--address                Print instruction addresses\n"
+		"\t--abs	                Don't create autolabels (absolute address mode)\n"
+		"\t--label-prefix <string>  Set prefix for auto-labels\n"
+		"\t--label-start <int>      Set starting suffix number for auto-labels\n"
+	);
+}
+
+// ----------------------------------------------------------------------------
 int main(int argc, char** argv)
 {
 	if (argc < 2)
 	{
 		fprintf(stderr, "Error: No filename or hexstring\n");
-		//usage();
+		usage();
 		return 1;
 	}
 
@@ -194,10 +206,42 @@ int main(int argc, char** argv)
 	{
 		if (strcmp(argv[opt], "--address") == 0)
 			osettings.show_address = true;
-		if (strcmp(argv[opt], "--header") == 0)
+		else if (strcmp(argv[opt], "--header") == 0)
 			osettings.show_header = true;
-		if (strcmp(argv[opt], "--abs") == 0)
+		else if (strcmp(argv[opt], "--abs") == 0)
 			osettings.abs_addressing = true;
+		else if (strcmp(argv[opt], "--label-prefix") == 0)
+		{
+			opt++;
+			if (opt < last_arg)
+			{
+				osettings.label_prefix = argv[opt];
+			}
+			else
+			{
+				fprintf(stderr, "Error: --label-prefix misses parameter\n");
+				return 1;
+			}
+		}
+		else if (strcmp(argv[opt], "--label-start") == 0)
+		{
+			opt++;
+			if (opt < last_arg)
+			{
+				osettings.label_start_id = atoi(argv[opt]);
+			}
+			else
+			{
+				fprintf(stderr, "Error: --label-start misses parameter\n");
+				return 1;
+			}
+		}
+		else
+		{
+			fprintf(stderr, "Error: Unknown option: '%s'\n", argv[opt]);
+			usage();
+			return 1;
+		}
 	}
 
 	const char* fname = argv[argc - 1];
