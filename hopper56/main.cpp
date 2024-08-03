@@ -19,6 +19,7 @@ struct output_settings
 {
 	bool show_address;			// print address for each line before opcode
 	bool show_header;			// print hex header for each line before opcode
+	bool abs_addressing;		// absolute addresses (don't create labels)
 	std::string label_prefix;	// prefix for all auto-labels, normally "L"
 	uint32_t label_start_id;	// starting number of label prefix, normally 0
 };
@@ -162,7 +163,8 @@ int process_bin_file(const uint8_t* data_ptr, long size, const hop56::decode_set
 	if (decode_buf(buf, dsettings, disasm))
 		return 1;
 
-	add_reference_symbols(disasm, osettings, bin_symbols);
+	if (!osettings.abs_addressing)
+		add_reference_symbols(disasm, osettings, bin_symbols);
 
 	print(disasm, osettings, bin_symbols, pOutput);
 	return 0;
@@ -181,6 +183,7 @@ int main(int argc, char** argv)
 	output_settings osettings = {};
 	osettings.show_address = false;
 	osettings.show_header = false;
+	osettings.abs_addressing = false;
 	osettings.label_prefix = "L";
 	osettings.label_start_id = 0;
 
@@ -193,6 +196,8 @@ int main(int argc, char** argv)
 			osettings.show_address = true;
 		if (strcmp(argv[opt], "--header") == 0)
 			osettings.show_header = true;
+		if (strcmp(argv[opt], "--abs") == 0)
+			osettings.abs_addressing = true;
 	}
 
 	const char* fname = argv[argc - 1];
