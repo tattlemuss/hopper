@@ -3,6 +3,31 @@
 #include "buffer.h"
 #include "instruction.h"
 
+/*
+	decode.cpp - converts binary data into a tokenized format which is easy to
+	print and analyse.
+
+	56000 opcodes fall into 2 groups: ones that include up to 2 "parallel moves",
+	and the standard opcodes. The top 4 bits are generally 0000 for the
+	non-parallel moves (although there are exceptions where the parallel move
+	types can contain 0000 there)
+
+	Parallel moves are in a 24:8 bit format where 24 bits describe the parallel parts.
+	We decode the parallel part in decode_pm, and use a table lookup for the bottom
+	8 bits (in pmove_table.i) where every opcode and operand is fixed.
+
+	Non-parallel moves are more complex. We use bits 14-19 inclusive (6 bits) for
+	another set of lookup table functions (nonp_tables.i) and dispatch to one of
+	27 decoder functions. These tables (and the signatures for the decoder functions
+	are generated from a script which reads the 'm56k.mch' opcode description file
+	from the rmac assembler (slightly edited to help the script.)
+
+	The decoder functions are grouped and keye on the pattern of variable fields
+	in the opcode, e.g. "decode_rrr" is for all opcodes that contain a single 3-bit
+	"rrr" field which might describe e.g. a R0-7 register. This helps group the
+	decoders into similar opcodes, such as all similar jump instructions.
+*/
+
 #define H56CHECK(x)		if (x) return 1;
 
 namespace hop56
