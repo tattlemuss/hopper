@@ -1267,9 +1267,7 @@ namespace hop56
 		inst.reset();
 		buffer_reader buf_copy = buf;
 
-		H56CHECK(buf.read_word(inst.header))
-
-		//printf("%04x -> %06x\n", buf.get_pos(), inst.header);
+		H56CHECK(buf_copy.read_word(inst.header))
 
 		// Decide on parallel-move vs non-parallel-move decode.
 		// For non-parallel moves (except "B,X:(R1)+	X0,B" type)
@@ -1278,19 +1276,21 @@ namespace hop56
 		int ret = 0;
 		if (top_bits == 0x0)
 			// Instruction without parallel move
-			ret = decode_non_pm(inst, inst.header, settings, buf);
+			ret = decode_non_pm(inst, inst.header, settings, buf_copy);
 		else
-			ret = decode_pm(inst, inst.header, settings, buf);
+			ret = decode_pm(inst, inst.header, settings, buf_copy);
 
 		if (ret == 0)
 		{
-			inst.word_count = buf.get_pos() - buf_copy.get_pos();
+			inst.word_count = buf_copy.get_pos() - buf.get_pos();
 			return ret;
 		}
-		// Decode failure
+
+		// Decode failure.
 		inst.opcode = Opcode::INVALID;
 		inst.word_count = 1;
 		set_abs(inst.operands[0], inst.header);
+		buf.advance(1U);
 		return ret;
 	}
 }
