@@ -176,7 +176,7 @@ void usage()
 		"options:\n"
 		"\t--header                 Show opcode hex header\n"
 		"\t--address                Print instruction addresses\n"
-		"\t--abs	                Don't create autolabels (absolute address mode)\n"
+		"\t--abs                    Don't create autolabels (absolute address mode)\n"
 		"\t--label-prefix <string>  Set prefix for auto-labels\n"
 		"\t--label-start <int>      Set starting suffix number for auto-labels\n"
 	);
