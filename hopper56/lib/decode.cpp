@@ -216,19 +216,36 @@ namespace hop56
 	//	OPCODE SHARED FUNCTIONS
 	// ========================================================================
 
-	// Speicifies the set of allowable addressing modes in parallel moves.
+	// Speciifies the set of allowable addressing modes in parallel moves.
+	// The full set of modes (EA_MODE_ALL) is
+	// 		(Rn)-Nn		0 0 0 n n n
+	// 		(Rn)+Nn		0 0 1 n n n
+	// 		(Rn)-		0 1 0 n n n
+	// 		(Rn)+		0 1 1 n n n
+	// 		(Rn)		1 0 0 n n n
+	// 		(Rn+Nn)		1 0 1 n n n
+	// 		-(Rn)		1 1 1 n n n
+	// 		Abs-addr	1 1 0 0 0 0
+	// 		Immediate	1 1 0 1 0 0			; not when dest operand!
+	// The other modes are subsets of the full set.
 	enum EA_MODE
 	{
 		EA_MODE_ALL,		// allows immediate
-		EA_MODE_WRITE,		// allows absolute address in extra word
-		EA_MODE_SHORT,		// only R-register-based EAs
-		EA_MODE_MOVEL,
+		EA_MODE_ABS,		// registers + absolute address, no immediate
+		EA_MODE_REGS,		// only R-register-based (Rn etc)
+		EA_MODE_LUA,		// only the first 4 entries (special case)
 		EA_MODE_COUNT
 	};
 
 	// Handle "mmm_rrr" addressing mode and register for Rn/abs/immediate addressing in parallel moves
-	static int decode_mmmrrr(operand& op, Memory mem, uint32_t mmm, uint32_t rrr, EA_MODE mode, buffer_reader& buf)
+	static int decode_mmmrrr(operand& op, Memory mem,
+		uint32_t mmm, uint32_t rrr, EA_MODE mode,
+		buffer_reader& buf)
 	{
+		// Special case: LUA only allows 4 modes
+		if (mode == EA_MODE_LUA && mmm > 3)
+			return 1;
+
 		uint32_t next = 0;
 		op.memory = mem;
 		switch (mmm)
@@ -241,20 +258,19 @@ namespace hop56
 			case 5: 	set_index_offset(op, rrr); return 0;
 			case 7:		set_predec(op, rrr); return 0;
 			case 6:
+				// Immediate mode only in "full"
 				if ((rrr == 0x4) && (mode == EA_MODE_ALL))
 				{
-					// Immediate value in next word -- can't write
 					H56CHECK(buf.read_word(next))
 					set_imm(op, next);
-					op.memory = Memory::MEM_NONE;
+					op.memory = MEM_NONE;
 					return 0;
 				}
 				else if ((rrr == 0x0) &&
 							((mode == EA_MODE_ALL) ||
-							 (mode == EA_MODE_WRITE) ||
-							 (mode == EA_MODE_MOVEL)))
+							 (mode == EA_MODE_ABS)))
 				{
-					// Absolute address write
+					// Absolute address
 					H56CHECK(buf.read_word(next))
 					set_abs(op, next);
 					return 0;
@@ -267,6 +283,7 @@ namespace hop56
 	}
 
 	// Decode short-format "mm rrr" fields used in XY parallel data moves.
+	// NOTE: this is different to LUA "mmmrrr" mode.
 	static int decode_mmrrr(operand& op, Memory mem, uint32_t mm, uint32_t rrr, buffer_reader& buf)
 	{
 		op.memory = mem;
@@ -293,12 +310,12 @@ namespace hop56
 		// Pre-choose modes and registers
 		uint32_t mmm = (pdata >> 3) & 0x7;
 		uint32_t rrr = (pdata >> 0) & 0x7;
+		EA_MODE mode = w ? EA_MODE_ALL : EA_MODE_ABS;	// here w==0 means "reading from reg, and writing to memory"
 
 		// Prep the most commonly-used operand slots/arguments
 		operand& op0 = inst.pmoves[0].operands[0];
 		operand& op1 = inst.pmoves[0].operands[1];
 		operand* opA, * opB;
-		EA_MODE default_mode = w ? EA_MODE_ALL : EA_MODE_WRITE;	// w==0 means "reading from reg, and writing to memory"
 
 		if (pdata == 0x2000)
 			return 0;			// No Parallel Move
@@ -324,7 +341,7 @@ namespace hop56
 			allocate_operands(inst.pmoves[1], w, opA, opB);
 			uint32_t LLL = ((pdata >> 8) & 0x3) | ((pdata >> 9) & 0x4);
 			H56CHECK(set_reg(*opB, pmove_registers_movel[LLL]))
-			return decode_mmmrrr(*opA, MEM_L, mmm, rrr, EA_MODE_MOVEL, buf);
+			return decode_mmmrrr(*opA, MEM_L, mmm, rrr, EA_MODE_ABS, buf);
 		}
 		if ((pdata & 0xf040) == 0x1000)
 		{
@@ -337,8 +354,7 @@ namespace hop56
 			uint32_t d = (pdata >> 9) & 0x1;
 		   	uint32_t ff = (pdata >> 10) & 0x3;		// S1/D1
 			H56CHECK(set_reg(*opB, pmove_registers_bank_x[ff]))
-			// TODO check since UM suggests SHORT modes only
-			H56CHECK(decode_mmmrrr(*opA, MEM_X, mmm, rrr, default_mode, buf))
+			H56CHECK(decode_mmmrrr(*opA, MEM_X, mmm, rrr, mode, buf))
 
 			// Second pmove is limited
 			H56CHECK(set_reg(inst.pmoves[1].operands[0], d ? Reg::B  : Reg::A))
@@ -356,8 +372,7 @@ namespace hop56
 			uint32_t e = (pdata >> 10) & 0x1;		// S2/D2
 			uint32_t d = (pdata >> 11) & 0x1;
 			H56CHECK(set_reg(*opB, pmove_registers_bank_y[ff]))
-			// TODO check since UM suggests SHORT modes only
-			H56CHECK(decode_mmmrrr(*opA, MEM_Y, mmm, rrr,  default_mode, buf))
+			H56CHECK(decode_mmmrrr(*opA, MEM_Y, mmm, rrr, mode, buf))
 
 			// Second pmove is limited
 			H56CHECK(set_reg(inst.pmoves[0].operands[0], d ? Reg::B  : Reg::A))
@@ -373,7 +388,7 @@ namespace hop56
 			uint32_t d = (pdata >> 8) & 0x1;
 			Reg accum_reg = registers_a_or_b[d];
 			H56CHECK(set_reg(op0, accum_reg))
-			H56CHECK(decode_mmmrrr(op1, MEM_X, mmm, rrr, EA_MODE_SHORT, buf))		// this is limited to short modes
+			H56CHECK(decode_mmmrrr(op1, MEM_X, mmm, rrr, EA_MODE_REGS, buf))		// this is limited to register modes
 
 			// Second pmove is always X0
 			H56CHECK(set_reg(inst.pmoves[1].operands[0], Reg::X0))
@@ -389,7 +404,7 @@ namespace hop56
 			uint32_t d = (pdata >> 8) & 0x1;
 			Reg accum_reg = registers_a_or_b[d];
 			H56CHECK(set_reg(inst.pmoves[1].operands[0], accum_reg))
-			H56CHECK(decode_mmmrrr(inst.pmoves[1].operands[1], MEM_Y, mmm, rrr, EA_MODE_SHORT, buf))		// this is limited to short modes
+			H56CHECK(decode_mmmrrr(inst.pmoves[1].operands[1], MEM_Y, mmm, rrr, EA_MODE_REGS, buf))		// this is limited to short modes
 
 			// Second pmove is always Y0
 			H56CHECK(set_reg(inst.pmoves[0].operands[0], Reg::Y0))
@@ -416,7 +431,7 @@ namespace hop56
 			allocate_operands(inst.pmoves[0], w, opA, opB);
 			uint32_t ddddd = ((pdata >> 8) & 0x7) | ((pdata >> 9) & 0x18);
 			H56CHECK(set_reg(*opB, pmove_registers_1[ddddd]))
-			return decode_mmmrrr(*opA, MEM_X, mmm, rrr, default_mode, buf);
+			return decode_mmmrrr(*opA, MEM_X, mmm, rrr, mode, buf);
 		}
 		if ((pdata & 0xc840) == 0x4840)
 		{
@@ -427,7 +442,7 @@ namespace hop56
 			allocate_operands(inst.pmoves[1], w, opA, opB);
 			uint32_t ddddd = ((pdata >> 8) & 0x7) | ((pdata >> 9) & 0x18);
 			H56CHECK(set_reg(*opB, pmove_registers_1[ddddd]))
-			return decode_mmmrrr(*opA, MEM_Y, mmm, rrr, default_mode, buf);
+			return decode_mmmrrr(*opA, MEM_Y, mmm, rrr, mode, buf);
 		}
 		if ((pdata & 0xfc00) == 0x2000)
 		{
@@ -701,7 +716,7 @@ namespace hop56
 	{
 		uint32_t mmm = (ctx.header >> 11) & 0x7;
 		uint32_t rrr = (ctx.header >>  8) & 0x7;
-		H56CHECK(decode_mmmrrr(ctx.inst.operands[0], Memory::MEM_NONE, mmm, rrr, EA_MODE_WRITE, ctx.buf))
+		H56CHECK(decode_mmmrrr(ctx.inst.operands[0], MEM_NONE, mmm, rrr, EA_MODE_ABS, ctx.buf))
 		ctx.inst.opcode = opcode;
 		return 0;
 	}
@@ -721,10 +736,10 @@ namespace hop56
 		set_imm(ctx.inst.operands[0], bbbbb);
 
 		uint32_t s = (ctx.header >> 6) & 0x1;		// memory bit
-		Memory mem = (s) ? Memory::MEM_Y : Memory::MEM_X;
+		Memory mem = (s) ? MEM_Y : MEM_X;
 		uint32_t mmm = (ctx.header >> 11) & 0x7;
 		uint32_t rrr = (ctx.header >>  8) & 0x7;
-		H56CHECK(decode_mmmrrr(ctx.inst.operands[1], mem, mmm, rrr, EA_MODE_SHORT, ctx.buf))
+		H56CHECK(decode_mmmrrr(ctx.inst.operands[1], mem, mmm, rrr, EA_MODE_ABS, ctx.buf))
 		ctx.inst.opcode = opcode;
 		if ((ctx.header >> 7) & 0x1)
 			return decode_jcc_dest(ctx);
@@ -747,7 +762,7 @@ namespace hop56
 
 		uint32_t aaaaaa = (ctx.header >> 8) & 0x3f;
 		uint32_t s = (ctx.header >> 6) & 0x1;		// memory bit
-		ctx.inst.operands[1].memory = (s) ? Memory::MEM_Y : Memory::MEM_X;
+		ctx.inst.operands[1].memory = (s) ? MEM_Y : MEM_X;
 		set_abs_short(ctx.inst.operands[1], aaaaaa);
 		ctx.inst.opcode = opcode;
 		if ((ctx.header >> 7) & 0x1)
@@ -771,7 +786,7 @@ namespace hop56
 
 		uint32_t pppppp = (ctx.header >> 8) & 0x3f;
 		uint32_t s = (ctx.header >> 6) & 0x1;		// memory bit
-		ctx.inst.operands[1].memory = (s) ? Memory::MEM_Y : Memory::MEM_X;
+		ctx.inst.operands[1].memory = (s) ? MEM_Y : MEM_X;
 		set_io_short(ctx.inst.operands[1], pppppp);
 		ctx.inst.opcode = opcode;
 		if ((ctx.header >> 7) & 0x1)
@@ -867,8 +882,8 @@ namespace hop56
 		uint32_t mmm = (ctx.header >> 11) & 0x7;
 		uint32_t rrr = (ctx.header >>  8) & 0x7;
 		uint32_t s = (ctx.header >> 6) & 0x1;		// memory bit
-		Memory mem = (s) ? Memory::MEM_Y : Memory::MEM_X;
-		H56CHECK(decode_mmmrrr(ctx.inst.operands[0], mem, mmm, rrr, EA_MODE_SHORT, ctx.buf))
+		Memory mem = (s) ? MEM_Y : MEM_X;
+		H56CHECK(decode_mmmrrr(ctx.inst.operands[0], mem, mmm, rrr, EA_MODE_REGS, ctx.buf))
 		ctx.inst.opcode = opcode;
 		return decode_rep_loop_address(ctx);
 	}
@@ -881,7 +896,7 @@ namespace hop56
 		// Short abs address
 		uint32_t aaaaaa = (ctx.header >> 8) & 0x3f;
 		uint32_t s = (ctx.header >> 6) & 0x1;		// memory bit
-		ctx.inst.operands[0].memory = (s) ? Memory::MEM_Y : Memory::MEM_X;
+		ctx.inst.operands[0].memory = (s) ? MEM_Y : MEM_X;
 		set_abs_short(ctx.inst.operands[0], aaaaaa);
 
 		ctx.inst.opcode = opcode;
@@ -930,9 +945,10 @@ namespace hop56
 	{
 		uint32_t mmm = (ctx.header >> 11) & 0x7;
 		uint32_t rrr = (ctx.header >>  8) & 0x7;
-		Memory mem = Memory::MEM_NONE;
-		// NOTE: strictly, using SHORT: is wrong here but the nonp_tables protect us
-		H56CHECK(decode_mmmrrr(ctx.inst.operands[0], mem, mmm, rrr, EA_MODE_SHORT, ctx.buf))
+		Memory mem = MEM_NONE;
+		// NOTE: as well as using MODE_LUA the nonp_tables protect us since "0" is specified
+		// in the top bit of the mmm area.
+		H56CHECK(decode_mmmrrr(ctx.inst.operands[0], mem, mmm, rrr, EA_MODE_LUA, ctx.buf))
 
 		uint32_t is_n = (ctx.header >> 3) & 0x1;
 		uint32_t ddd = (ctx.header >> 0) & 0x7;
@@ -959,7 +975,7 @@ namespace hop56
 	{
 		uint32_t ddddd = (ctx.header >> 0) & 0x1f;
 		uint32_t iiiiiiii = (ctx.header >> 8) & 0xff;
-		// TODO: is this signed or not?
+		// Is this signed or not? It sort of depends on the register!
 		set_imm(ctx.inst.operands[0], iiiiiiii);
 		H56CHECK(set_reg(ctx.inst.operands[1], registers_movec[ddddd]))
 		ctx.inst.opcode = opcode;
@@ -979,8 +995,12 @@ namespace hop56
 		uint32_t mmm = (ctx.header >> 11) & 0x7;
 		uint32_t rrr = (ctx.header >>  8) & 0x7;
 		uint32_t s = (ctx.header >> 6) & 0x1;		// memory bit
-		Memory mem = (s) ? Memory::MEM_Y : Memory::MEM_X;
-		H56CHECK(decode_mmmrrr(*opA, mem, mmm, rrr, EA_MODE_ALL, ctx.buf))
+		Memory mem = (s) ? MEM_Y : MEM_X;
+
+		// NOTE: this isn't really important since the tables mean
+		// that a different MOVEC decoder is used for immediate
+		EA_MODE mode = w ? EA_MODE_ALL : EA_MODE_ABS;	// here w==0 means "reading from reg, and writing to memory"
+		H56CHECK(decode_mmmrrr(*opA, mem, mmm, rrr, mode, ctx.buf))
 
 		uint32_t ddddd = (ctx.header >> 0) & 0x1f;
 		H56CHECK(set_reg(*opB, registers_movec[ddddd]))
@@ -1015,7 +1035,7 @@ namespace hop56
 
 		uint32_t aaaaaa = (ctx.header >> 8) & 0x3f;
 		uint32_t s = (ctx.header >> 6) & 0x1;		// memory bit
-		opA->memory = (s) ? Memory::MEM_Y : Memory::MEM_X;
+		opA->memory = (s) ? MEM_Y : MEM_X;
 		set_abs_short(*opA, aaaaaa);
 
 		uint32_t ddddd = (ctx.header >> 0) & 0x1f;
@@ -1077,8 +1097,8 @@ namespace hop56
 
 		uint32_t mmm = (ctx.header >> 11) & 0x7;
 		uint32_t rrr = (ctx.header >>  8) & 0x7;
-		Memory mem = Memory::MEM_P;
-		H56CHECK(decode_mmmrrr(*opA, mem, mmm, rrr, EA_MODE_ALL, ctx.buf))
+		Memory mem = MEM_P;
+		H56CHECK(decode_mmmrrr(*opA, mem, mmm, rrr, EA_MODE_ABS, ctx.buf))
 
 		uint32_t dddddd = (ctx.header >> 0) & 0x3f;
 		H56CHECK(set_reg(*opB, registers_triple_bit[dddddd]))
@@ -1108,7 +1128,7 @@ namespace hop56
 		allocate_operands(ctx.inst, w, opA, opB);
 
 		uint32_t aaaaaa = (ctx.header >> 8) & 0x3f;
-		opA->memory = Memory::MEM_P;
+		opA->memory = MEM_P;
 		set_abs_short(*opA, aaaaaa);
 
 		uint32_t dddddd = (ctx.header >> 0) & 0x3f;
@@ -1130,13 +1150,13 @@ namespace hop56
 		uint32_t mmm = (ctx.header >> 11) & 0x7;
 		uint32_t rrr = (ctx.header >>  8) & 0x7;
 
-		Memory mem = (ctx.header >> 6) & 0x1 ? Memory::MEM_Y : MEM_X;
-		// NO CHECK disallow immediate with write
-		H56CHECK(decode_mmmrrr(*opA, mem, mmm, rrr, EA_MODE_ALL, ctx.buf))
+		Memory mem = (ctx.header >> 6) & 0x1 ? MEM_Y : MEM_X;
+		EA_MODE mode = w ? EA_MODE_ALL : EA_MODE_ABS;	// here w==0 means "reading from reg, and writing to memory"
+		H56CHECK(decode_mmmrrr(*opA, mem, mmm, rrr, mode, ctx.buf))
 
 		uint32_t pppppp = (ctx.header >> 0) & 0x3f;
 		set_io_short(*opB, pppppp);
-		opB->memory = (ctx.header >> 16) & 0x1 ? Memory::MEM_Y : MEM_X;
+		opB->memory = (ctx.header >> 16) & 0x1 ? MEM_Y : MEM_X;
 
 		ctx.inst.opcode = opcode;
 		return 0;
@@ -1154,13 +1174,11 @@ namespace hop56
 		// Bit 7 decides whether this is EA or AA
 		uint32_t mmm = (ctx.header >> 11) & 0x7;
 		uint32_t rrr = (ctx.header >>  8) & 0x7;
-		Memory mem = MEM_P;
-		// NO CHECK disallow immediate with write
-		H56CHECK(decode_mmmrrr(*opA, mem, mmm, rrr, EA_MODE_ALL, ctx.buf))
+		H56CHECK(decode_mmmrrr(*opA, MEM_P, mmm, rrr, EA_MODE_ABS, ctx.buf))
 
 		uint32_t pppppp = (ctx.header >> 0) & 0x3f;
 		set_io_short(*opB, pppppp);
-		opB->memory = (ctx.header >> 16) & 0x1 ? Memory::MEM_Y : MEM_X;
+		opB->memory = (ctx.header >> 16) & 0x1 ? MEM_Y : MEM_X;
 
 		ctx.inst.opcode = opcode;
 		return 0;
@@ -1181,7 +1199,7 @@ namespace hop56
 
 		uint32_t pppppp = (ctx.header >> 0) & 0x3f;
 		set_io_short(*opB, pppppp);
-		opB->memory = (ctx.header >> 16) & 0x1 ? Memory::MEM_Y : MEM_X;
+		opB->memory = (ctx.header >> 16) & 0x1 ? MEM_Y : MEM_X;
 
 		ctx.inst.opcode = opcode;
 		return 0;

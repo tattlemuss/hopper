@@ -1,6 +1,17 @@
 	.org	p:0
 
+	movep	#$123455,x:<<$ffeb
+	movep	x:<<$ffeb,x:$1234
+	movec	#$123456,la
+
+	movep	p:$123456,y:<<$fffc
+
+	adc	x,b	#$6000,x0
+	adc	x,b	#$ffa000,x0
+	adc	x,b	x:>$15,x0
 	adc	y,a	b,x:(r1)+	x0,b
+	movec	y:$123456,la
+	movec	la,y:$3456
 
 	abs 	a
 	abs	b
@@ -320,9 +331,9 @@
 	adc	x,b	#6,x0
 	adc	x,b	#$6000,x0
 	adc	x,b	#$ffa000,x0
-	adc	x,b	x:$15,x0
-	adc	x,b	x:$1500,x0
-	adc	x,b	x0,x:$15
+	adc	x,b	x:>$15,x0
+	adc	x,b	x:>$1500,x0
+	adc	x,b	x0,x:>$15
 
 	adc	x,b	a,x:(r5)-n5
 	adc	x,b			a,y:(r5)-n5
@@ -551,10 +562,10 @@
 
 	movec	#$123456,la
 
-	movec	x:$15,lc
-	movec	y:$15,lc
-	movec	lc,x:$15
-	movec	lc,y:$15
+	movec	x:>$15,lc
+	movec	y:>$15,lc
+	movec	lc,x:>$15
+	movec	lc,y:>$15
 
 	movec	la,la
 	movec	la,x0
