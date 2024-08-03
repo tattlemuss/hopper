@@ -1,10 +1,12 @@
 #!/usr/bin/env sh
+set -e
 CC=g++
 LD=g++
 CFLAGS=" -DDEBUG -std=c++11 -g -Wall"
 LDFLAGS="-lc"
 
 # Just build everything -- this project isn't big
+set -x
 
 # Library (decoder) cost
 ${CC} ${CFLAGS} -c -o decode.o      lib/decode.cpp
