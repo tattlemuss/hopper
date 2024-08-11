@@ -1,5 +1,5 @@
-#ifndef TIMING_68_H
-#define TIMING_68_H
+#ifndef HOPPER68_TIMING_H
+#define HOPPER68_TIMING_H
 #include <cstdint>
 #include <vector>
 

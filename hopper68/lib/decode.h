@@ -1,5 +1,5 @@
-#ifndef DECODE_68_H
-#define DECODE_68_H
+#ifndef HOPPER68_DECODE_H
+#define HOPPER68_DECODE_H
 
 namespace hop68
 {

@@ -1,5 +1,5 @@
-#ifndef INSTRUCTION_68_H
-#define INSTRUCTION_68_H
+#ifndef HOPPER68_INSTRUCTION_H
+#define HOPPER68_INSTRUCTION_H
 
 #include <cstdint>
 
