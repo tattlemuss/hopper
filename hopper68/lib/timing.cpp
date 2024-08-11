@@ -1,7 +1,7 @@
 #include "timing.h"
 #include "instruction.h"
 
-namespace hopper68
+namespace hop68
 {
 struct time_entry
 {

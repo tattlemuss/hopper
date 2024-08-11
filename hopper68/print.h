@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-namespace hopper68
+namespace hop68
 {
 // Forward declarations
 struct instruction;
@@ -16,9 +16,9 @@ struct operand;
 class symbols;
 
 // Check if an opcode jumps to another known address, and return that address
-extern bool calc_relative_address(const hopper68::operand& op, uint32_t inst_address, uint32_t& target_address);
+extern bool calc_relative_address(const hop68::operand& op, uint32_t inst_address, uint32_t& target_address);
 
 // Write out an instruction's opcode and operands to the file stream.
-extern void print(const hopper68::instruction& inst, const symbols& symbols, uint32_t inst_address, FILE* pFile);
+extern void print(const hop68::instruction& inst, const symbols& symbols, uint32_t inst_address, FILE* pFile);
 
 #endif

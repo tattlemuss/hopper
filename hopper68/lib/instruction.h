@@ -1,9 +1,9 @@
-#ifndef INSTRUCTION_H
-#define INSTRUCTION_H
+#ifndef INSTRUCTION_68_H
+#define INSTRUCTION_68_H
 
 #include <cstdint>
 
-namespace hopper68
+namespace hop68
 {
 // ----------------------------------------------------------------------------
 //	INSTRUCTION STORAGE
@@ -385,7 +385,7 @@ struct operand
 			IndexRegister reg1;
 			IndexRegister reg2;
 		} indirect_register_pair;
-		
+
 	};
 };
 

@@ -1,9 +1,9 @@
-#ifndef TIMING_H
-#define TIMING_H
+#ifndef TIMING_68_H
+#define TIMING_68_H
 #include <cstdint>
 #include <vector>
 
-namespace hopper68
+namespace hop68
 {
 struct instruction;
 
@@ -19,5 +19,4 @@ struct timing
 
 extern int calc_timing(const instruction& inst, timing& result);
 }
-#endif // TIMING_H
-
+#endif

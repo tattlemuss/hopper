@@ -1,7 +1,7 @@
-#ifndef DECODE_H
-#define DECODE_H
+#ifndef DECODE_68_H
+#define DECODE_68_H
 
-namespace hopper68
+namespace hop68
 {
 class buffer_reader;
 struct instruction;

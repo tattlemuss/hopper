@@ -1,9 +1,9 @@
-#ifndef BUFFER_H
-#define BUFFER_H
+#ifndef BUFFER_68_H
+#define BUFFER_68_H
 
 #include <cstdint>
 
-namespace hopper68
+namespace hop68
 {
 // ----------------------------------------------------------------------------
 // Bounded access to a range of memory
