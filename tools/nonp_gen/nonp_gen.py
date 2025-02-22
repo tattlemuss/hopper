@@ -147,6 +147,9 @@ def create_decoder(codes : List[Code], idx, fh):
         fh.write("  if ((ctx.header & 0x%05x) == 0x%05x)\n" % (code.mask, code.val))
         fh.write("     return decode_nonp_%s(ctx, Opcode::%s);\n" % (code.field_tag, code.opcode))
         #print(code.args)
+    if len(codes) == 0:
+        fh.write("  (void)ctx;\n") # prevent warnings
+
     fh.write("  return 1;\n")
     fh.write("}\n")
 
