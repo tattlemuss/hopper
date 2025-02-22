@@ -77,7 +77,7 @@ static void print(const hop56::operand& operand, const symbols& symbols, FILE* p
 	}
 }
 
-int print(const hop56::instruction& inst, const symbols& symbols, uint32_t address, FILE* pOutput)
+int print(const hop56::instruction& inst, const symbols& symbols, FILE* pOutput)
 {
 	if (inst.opcode == hop56::INVALID)
 	{

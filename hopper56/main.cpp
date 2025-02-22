@@ -57,7 +57,7 @@ int print(const disassembly& disasm, const output_settings& osettings, const sym
 			fprintf(pOutput, "[%06x] ", line.inst.header);
 
 		fprintf(pOutput, "\t");
-		print(inst, symbols, line.address, pOutput);
+		print(inst, symbols, pOutput);
 		fprintf(pOutput, "\n");
 	}
 	return 0;
@@ -88,7 +88,7 @@ int decode_buf(hop56::buffer_reader& buf, const hop56::decode_settings& dsetting
 }
 
 // Check if an operand jumps to another known address, and return that address
-bool get_address(const hop56::operand& op, uint32_t inst_address, symbol::addr_t& target_address)
+bool get_address(const hop56::operand& op, symbol::addr_t& target_address)
 {
 	if (op.type == hop56::operand::ABS)
 	{
@@ -119,7 +119,7 @@ void add_reference_symbols(const disassembly& disasm, const output_settings& set
 		for (size_t o = 0; o < 3; ++o)
 		{
 			const hop56::operand& op = inst.operands[o];
-			if (get_address(op, line.address, target_address))
+			if (get_address(op, target_address))
 			{
 				if (!find_symbol(symbols, hop56::Memory::MEM_P, target_address.addr, sym))
 				{
@@ -136,7 +136,7 @@ void add_reference_symbols(const disassembly& disasm, const output_settings& set
 			for (size_t o = 0; o < 2; ++o)
 			{
 				const hop56::operand& op = inst.pmoves[pm].operands[o];
-				if (get_address(op, line.address, target_address))
+				if (get_address(op, target_address))
 				{
 					if (!find_symbol(symbols, target_address.mem, target_address.addr, sym))
 					{
