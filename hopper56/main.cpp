@@ -133,7 +133,7 @@ void add_reference_symbols(const disassembly& disasm, const output_settings& set
 		// Now check pmoves
 		for (size_t pm = 0; pm < 2; ++pm)
 		{
-			for (size_t o = 0; o < 3; ++o)
+			for (size_t o = 0; o < 2; ++o)
 			{
 				const hop56::operand& op = inst.pmoves[pm].operands[o];
 				if (get_address(op, line.address, target_address))
