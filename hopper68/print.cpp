@@ -322,8 +322,11 @@ void print(const hop68::instruction& inst, const symbols& symbols, uint32_t inst
 		fprintf(pFile, "dc.w $%x", inst.header);
 		return;
 	}
-	fprintf(pFile, "%s", hop68::get_opcode_string(inst.opcode));
-	fprintf(pFile, "%s", hop68::get_suffix_string(inst.suffix));
+	char fullop[16];
+	snprintf(fullop, 16, "%s%s", hop68::get_opcode_string(inst.opcode),
+				hop68::get_suffix_string(inst.suffix));
+	fullop[15] = 0;
+	fprintf(pFile, "%-8s", fullop);
 
 	if (inst.op0.type != hop68::OpType::INVALID)
 	{
