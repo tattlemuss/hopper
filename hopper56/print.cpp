@@ -5,7 +5,7 @@
 #include <string>
 #include <cstring>
 
-#include "lib/instruction.h"
+#include "lib/instruction56.h"
 #include "symbols.h"
 
 #define REGNAME		hop56::get_register_string

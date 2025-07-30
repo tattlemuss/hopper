@@ -6,10 +6,10 @@
 #include <string>
 #include <cstring>
 
-#include "lib/buffer.h"
-#include "lib/decode.h"
-#include "lib/instruction.h"
-#include "lib/timing.h"
+#include "lib/buffer68.h"
+#include "lib/decode68.h"
+#include "lib/instruction68.h"
+#include "lib/timing68.h"
 #include "symbols.h"
 #include "print.h"
 
@@ -189,6 +189,8 @@ int print(const symbols& symbols, const line_numbers& lines,
 void add_reference_symbols(const disassembly& disasm, const output_settings& settings, symbols& symbols)
 {
 	uint32_t label_id = settings.label_start_id;
+	uint32_t last_address = disasm.lines.back().address;
+
 	for (size_t i = 0; i < disasm.lines.size(); ++i)
 	{
 		const disassembly::line& line = disasm.lines[i];
@@ -206,10 +208,25 @@ void add_reference_symbols(const disassembly& disasm, const output_settings& set
 				++label_id;
 			}
 		}
+
+		if (line.inst.op0.type == hop68::ABSOLUTE_LONG)
+		{
+			target_address = line.inst.op0.absolute_long.longaddr;
+			symbol sym;
+			if (target_address <= last_address && !find_symbol(symbols, target_address, sym))
+			{
+				sym.address = target_address;
+				sym.section = symbol::section_type::TEXT;
+				sym.label = settings.label_prefix + std::to_string(label_id);
+				add_symbol(symbols, sym);
+				++label_id;
+			}
+		}
+
 		if (calc_relative_address(line.inst.op1, line.address, target_address))
 		{
 			symbol sym;
-			if (!find_symbol(symbols, target_address, sym))
+			if (target_address <  !find_symbol(symbols, target_address, sym))
 			{
 				sym.address = target_address;
 				sym.section = symbol::section_type::TEXT;
@@ -278,6 +295,8 @@ int read_symbols(hop68::buffer_reader& buf, const tos_header& header, symbols& s
 			if (buf.read(name + 8, 14))
 				return 1;
 		}
+
+		printf("; Symbol %s addr: %d id:%x\n", (const char*)name, symbol_address, symbol_id);
 
 		symbol sym;
 		sym.label = std::string((const char*)name);
@@ -528,6 +547,11 @@ int process_tos_file(const uint8_t* data_ptr, long size, const hop68::decode_set
 
 	if (header.ph_branch != 0x601a)
 		return 1;
+
+	fprintf(pOutput, "; Text size %d...\n", header.ph_tlen);
+	fprintf(pOutput, "; Data size %d...\n", header.ph_dlen);
+	fprintf(pOutput, "; BSS size  %d...\n", header.ph_blen);
+	fprintf(pOutput, "; Symbol size  %d...\n", header.ph_slen);
 
 	// Next section is text
 	fprintf(pOutput, "; Reading text section\n");

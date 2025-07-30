@@ -3,7 +3,7 @@
 // representations that suit the use-case.
 #include "print.h"
 
-#include "lib/instruction.h"
+#include "lib/instruction68.h"
 #include "symbols.h"
 
 // ----------------------------------------------------------------------------

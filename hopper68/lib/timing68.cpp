@@ -1,5 +1,5 @@
-#include "timing.h"
-#include "instruction.h"
+#include "timing68.h"
+#include "instruction68.h"
 
 namespace hop68
 {
@@ -7,7 +7,7 @@ struct time_entry
 {
 	Opcode		op;
 	Suffix		suffix;
-	OpType		type0;	
+	OpType		type0;
 	OpType		type1;
 	uint8_t		time_min;
 	uint8_t		time_max;
@@ -16,7 +16,7 @@ struct time_entry
 
 #define TIMING(op, suf, type0, type1, time, flags)	{	Opcode::op, Suffix::suf, OpType::type0, OpType::type1, time, time, flags }
 
-static const time_entry g_timingEntry[] = 
+static const time_entry g_timingEntry[] =
 {
 #include "timing_table.i"
 
@@ -114,17 +114,17 @@ int calc_timing(const instruction& inst, timing& result)
 		curr_entry->op != Opcode::COUNT;
 		++curr_entry)
 	{
-		if (curr_entry->op != inst.opcode) 
+		if (curr_entry->op != inst.opcode)
 			continue;
 		if (inst.suffix != Suffix::NONE &&
 			curr_entry->suffix != Suffix::NONE &&
-			 curr_entry->suffix != inst.suffix) 
+			 curr_entry->suffix != inst.suffix)
 			continue;
 		if ( curr_entry->type0 != OpType::INVALID &&
 			 inst.op0.type     != OpType::INVALID &&
 			 curr_entry->type0 != inst.op0.type)
 			continue;
-		if (curr_entry->type1 != OpType::INVALID && 
+		if (curr_entry->type1 != OpType::INVALID &&
 			 inst.op1.type     != OpType::INVALID &&
 			 curr_entry->type1 != inst.op1.type)
 			continue;

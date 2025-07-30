@@ -5,9 +5,9 @@
 #include <vector>
 #include <string>
 
-#include "lib/buffer.h"
-#include "lib/decode.h"
-#include "lib/instruction.h"
+#include "lib/buffer56.h"
+#include "lib/decode56.h"
+#include "lib/instruction56.h"
 #include "print.h"
 #include "symbols.h"
 

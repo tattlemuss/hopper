@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <map>
-#include "lib/instruction.h"
+#include "lib/instruction56.h"
 
 // ----------------------------------------------------------------------------
 //	SYMBOL STORAGE
