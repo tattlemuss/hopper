@@ -629,10 +629,7 @@ int process_tos_file(const uint8_t* data_ptr, long size, const hop68::decode_set
 			++it)
 	{
 		if (it->second.label.size() == 0)
-		{
-			printf("label L%u maps to $%x\n", id, it->first);
 			it->second.label = osettings.label_prefix + std::to_string(id++);
-		}
 	}
 
 	print(exe_symbols, lines, disasm, osettings, pOutput);
