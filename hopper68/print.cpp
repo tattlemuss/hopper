@@ -284,12 +284,20 @@ void print(const hop68::operand& operand, const symbols& symbols, uint32_t inst_
 			print_indexed_68020(operand.indirect_index_68020, symbols, -1, -1, inst_address, pFile);
 			return;
 		case hop68::OpType::IMMEDIATE:
-			if (operand.imm.size == hop68::Size::LONG)
+		{
+			// Special case: show long immediates as labels, if we know a reloc
+			// has taken place here.
+			// We know the reloc has to be at +2 in the instruction, since it is
+			// always a source operand for immediates.
+			uint32_t target = 0;
+			if (operand.imm.size == hop68::Size::LONG &&
+				find_reloc(symbols, inst_address + 2, target))
 			{
 				symbol sym;
-				if (find_symbol(symbols, operand.imm.val0, sym))
+				if (target == operand.imm.val0 &&
+					find_symbol(symbols, operand.imm.val0, sym))
 				{
-					fprintf(pFile, "%s", sym.label.c_str());
+					fprintf(pFile, "#%s", sym.label.c_str());
 					return;
 				}
 			}
@@ -298,6 +306,7 @@ void print(const hop68::operand& operand, const symbols& symbols, uint32_t inst_
 			else
 				fprintf(pFile, "#$%x", operand.imm.val0);
 			return;
+		}
 		case hop68::OpType::D_REGISTER_PAIR:
 			fprintf(pFile, "d%u:d%u", operand.d_register_pair.dreg1, operand.d_register_pair.dreg2);
 			return;

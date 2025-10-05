@@ -446,6 +446,9 @@ static int add_reloc_label(uint32_t addr, hop68::buffer_reader& text_buf,
 	sym.section = symbol::section_type::TEXT;
 	sym.label = "";
 	add_symbol(symbols, sym);
+
+	// Flag that a relocation address existed
+	symbols.relocs[addr] = data;
 	return 0;
 }
 
@@ -621,12 +624,15 @@ int process_tos_file(const uint8_t* data_ptr, long size, const hop68::decode_set
 
 	// Rename auto-labelled symbols to be in address-order
 	uint32_t id = osettings.label_start_id;
-	for (symbols::map::iterator it = exe_symbols.table.begin();
+	for (symbols::sym_map::iterator it = exe_symbols.table.begin();
 			it != exe_symbols.table.end();
 			++it)
 	{
 		if (it->second.label.size() == 0)
+		{
+			printf("label L%u maps to $%x\n", id, it->first);
 			it->second.label = osettings.label_prefix + std::to_string(id++);
+		}
 	}
 
 	print(exe_symbols, lines, disasm, osettings, pOutput);

@@ -26,11 +26,14 @@ struct symbol
 class symbols
 {
 public:
-	typedef		std::map<uint32_t, symbol> map;
-	map			table;
+	typedef		std::map<uint32_t, symbol> sym_map;
+	typedef		std::map<uint32_t, uint32_t> reloc_map;		// reloc_addr -> offset address
+	sym_map			table;
+	reloc_map		relocs;								// locations where relocations happened
 };
 
 extern bool add_symbol(symbols& symbols, const symbol& new_symbol);
 extern bool find_symbol(const symbols& symbols, uint32_t address, symbol& result);
+extern bool find_reloc(const symbols& symbols, uint32_t address, uint32_t& target);
 
 #endif

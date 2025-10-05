@@ -13,10 +13,21 @@ extern bool add_symbol(symbols& symbols, const symbol& new_symbol)
 
 bool find_symbol(const symbols& symbols, uint32_t address, symbol& result)
 {
-	std::map<uint32_t, symbol>::const_iterator it = symbols.table.find(address);
+	symbols::sym_map::const_iterator it = symbols.table.find(address);
 	if (it != symbols.table.end())
 	{
 		result = it->second;
+		return true;
+	}
+	return false;
+}
+
+bool find_reloc(const symbols& symbols, uint32_t address, uint32_t& target)
+{
+	symbols::reloc_map::const_iterator it = symbols.relocs.find(address);
+	if (it != symbols.relocs.end())
+	{
+		target = it->second;
 		return true;
 	}
 	return false;
