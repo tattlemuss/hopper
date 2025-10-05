@@ -19,6 +19,7 @@ struct output_settings
 {
 	bool show_address;			// print address for each line before opcode
 	bool show_timings;			// print (guessed) timings for each line (valid for 68000 only)
+	bool autolabel;				// autolabelling on/off
 	std::string label_prefix;	// prefix for all auto-labels, normally "L"
 	uint32_t label_start_id;	// starting number of label prefix, normally 0
 };
@@ -142,9 +143,8 @@ int print(const symbols& symbols, const line_numbers& lines,
 		}
 
 		if (osettings.show_address)
-		{
-			fprintf(pOutput, ">> %04x:   $%04x ", line.address, line.inst.header);
-		}
+			fprintf(pOutput, "$%x\t", line.address);
+
 		fprintf(pOutput, "\t");
 		print(inst, symbols, line.address, pOutput);
 
@@ -586,7 +586,8 @@ int process_tos_file(const uint8_t* data_ptr, long size, const hop68::decode_set
 	if (decode_buf(text_buf, dsettings, disasm))
 		return 1;
 
-	add_reference_symbols(disasm, osettings, exe_symbols);
+	if (osettings.autolabel)
+		add_reference_symbols(disasm, osettings, exe_symbols);
 
 	print(exe_symbols, lines, disasm, osettings, pOutput);
 	return 0;
@@ -711,6 +712,7 @@ void usage()
 		"\t--bin       Read binary file rather than .prg\n"
 		"\t--address   Print instruction addresses\n"
 		"\t--timings   Print estimated timings (Atari ST 68000 only)\n"
+		"\t--no-labels Do not add automatically-detected labels\n"
 		"\t--m68010\n"
 		"\t--m68020\n"
 		"\t--m68030    Select CPU type (default m68000)\n"
@@ -734,6 +736,7 @@ int main(int argc, char** argv)
 	output_settings osettings = {};
 	osettings.show_address = false;
 	osettings.show_timings = false;
+	osettings.autolabel = true;
 	osettings.label_prefix = "L";
 	osettings.label_start_id = 0;
 
@@ -751,6 +754,8 @@ int main(int argc, char** argv)
 			osettings.show_address = true;
 		else if (strcmp(argv[opt], "--timings") == 0)
 			osettings.show_timings = true;
+		else if (strcmp(argv[opt], "--no-labels") == 0)
+			osettings.autolabel = false;
 		else if (strcmp(argv[opt], "--m68010") == 0)
 			dsettings.cpu_type = hop68::CPU_TYPE_68010;
 		else if (strcmp(argv[opt], "--m68020") == 0)
