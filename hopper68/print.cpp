@@ -328,20 +328,20 @@ void print(const hop68::instruction& inst, const symbols& symbols, uint32_t inst
 {
 	if (inst.opcode == hop68::Opcode::NONE)
 	{
-		fprintf(pFile, "dc.w $%x", inst.header);
+		fprintf(pFile, "dc.w     $%x", inst.header);
 		return;
 	}
-	char fullop[16];
-	snprintf(fullop, 16, "%s%s", hop68::get_opcode_string(inst.opcode),
+	int len = fprintf(pFile, "%s%s", hop68::get_opcode_string(inst.opcode),
 				hop68::get_suffix_string(inst.suffix));
-	fullop[15] = 0;
-	fprintf(pFile, "%-8s", fullop);
 
-	if (inst.op0.type != hop68::OpType::INVALID)
-	{
+	if (inst.op0.type == hop68::OpType::INVALID)
+		return; // early out with no operands, avoids trailing spaces
+
+	while (len++ < 9)
 		fprintf(pFile, " ");
-		print(inst.op0, symbols, inst_address, pFile);
-	}
+
+	print(inst.op0, symbols, inst_address, pFile);
+
 	if (inst.bf0.valid)
 		print_bitfield(inst.bf0, pFile);
 
