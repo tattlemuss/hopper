@@ -2,6 +2,8 @@
 
 extern bool add_symbol(symbols& symbols, const symbol& new_symbol)
 {
+	if (symbols.table.find(new_symbol.address) != symbols.table.end())
+		return false;
 	std::pair<uint32_t, symbol> p;
 	p.first = new_symbol.address;
 	p.second = new_symbol;

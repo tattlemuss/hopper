@@ -26,7 +26,8 @@ struct symbol
 class symbols
 {
 public:
-	std::map<uint32_t, symbol>		table;
+	typedef		std::map<uint32_t, symbol> map;
+	map			table;
 };
 
 extern bool add_symbol(symbols& symbols, const symbol& new_symbol);

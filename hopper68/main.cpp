@@ -203,7 +203,6 @@ void add_reference_symbols(const disassembly& disasm, const output_settings& set
 			{
 				sym.address = target_address;
 				sym.section = symbol::section_type::TEXT;
-				sym.label = settings.label_prefix + std::to_string(label_id);
 				add_symbol(symbols, sym);
 				++label_id;
 			}
@@ -217,7 +216,6 @@ void add_reference_symbols(const disassembly& disasm, const output_settings& set
 			{
 				sym.address = target_address;
 				sym.section = symbol::section_type::TEXT;
-				sym.label = settings.label_prefix + std::to_string(label_id);
 				add_symbol(symbols, sym);
 				++label_id;
 			}
@@ -230,7 +228,6 @@ void add_reference_symbols(const disassembly& disasm, const output_settings& set
 			{
 				sym.address = target_address;
 				sym.section = symbol::section_type::TEXT;
-				sym.label = settings.label_prefix + std::to_string(label_id);
 				add_symbol(symbols, sym);
 				++label_id;
 			}
@@ -429,8 +426,33 @@ static int read_debug_hcln_info(hop68::buffer_reader& buf, line_numbers& lines, 
 }
 
 // ----------------------------------------------------------------------------
+static int add_reloc_label(uint32_t addr, hop68::buffer_reader& text_buf,
+	symbols& symbols)
+{
+	text_buf.set_pos(0);
+	if (addr + 4 > text_buf.get_remain())
+		return 0;
+
+	// This longword is relocated, so can be treated as a symbol.
+	// Read the longword value, then create a text symbol
+	uint32_t data;
+	text_buf.set_pos(addr);
+	if (text_buf.read_long(data))
+		return 1;
+	text_buf.set_pos(0);
+
+	symbol sym;
+	sym.address = data;
+	sym.section = symbol::section_type::TEXT;
+	sym.label = "";
+	add_symbol(symbols, sym);
+	return 0;
+}
+
+// ----------------------------------------------------------------------------
 // Read relocation information and debug line number information.
-static int read_reloc(hop68::buffer_reader& buf, line_numbers& lines)
+static int read_reloc(hop68::buffer_reader& buf, hop68::buffer_reader& text_buf,
+	symbols& symbols, line_numbers& lines, bool autolabel)
 {
 	uint32_t addr;
 	if (buf.read_long(addr))
@@ -439,6 +461,8 @@ static int read_reloc(hop68::buffer_reader& buf, line_numbers& lines)
 	// 0 at start meeans "no reloc info"
 	if (addr)
 	{
+		if (autolabel)
+			add_reloc_label(addr, text_buf, symbols);
 		while (1)
 		{
 			uint8_t offset;
@@ -455,6 +479,8 @@ static int read_reloc(hop68::buffer_reader& buf, line_numbers& lines)
 			else
 			{
 				addr += offset;
+				if (autolabel)
+					add_reloc_label(addr, text_buf, symbols);
 			}
 		}
 	}
@@ -580,14 +606,28 @@ int process_tos_file(const uint8_t* data_ptr, long size, const hop68::decode_set
 
 	buf.advance(header.ph_slen);
 	hop68::buffer_reader reloc_buf(buf.get_data(), buf.get_remain(), 0);
-	read_reloc(reloc_buf, lines);
+
+	// Read relocations (and autolabel them if necessary)
+	// Read line-information data from Hisoft tools
+	read_reloc(reloc_buf, text_buf, exe_symbols, lines, osettings.autolabel);
 
 	disassembly disasm;
 	if (decode_buf(text_buf, dsettings, disasm))
 		return 1;
 
+	// Scan decoded instructions and add labels from operands
 	if (osettings.autolabel)
 		add_reference_symbols(disasm, osettings, exe_symbols);
+
+	// Rename auto-labelled symbols to be in address-order
+	uint32_t id = osettings.label_start_id;
+	for (symbols::map::iterator it = exe_symbols.table.begin();
+			it != exe_symbols.table.end();
+			++it)
+	{
+		if (it->second.label.size() == 0)
+			it->second.label = osettings.label_prefix + std::to_string(id++);
+	}
 
 	print(exe_symbols, lines, disasm, osettings, pOutput);
 	return 0;

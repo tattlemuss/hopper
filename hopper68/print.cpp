@@ -284,6 +284,15 @@ void print(const hop68::operand& operand, const symbols& symbols, uint32_t inst_
 			print_indexed_68020(operand.indirect_index_68020, symbols, -1, -1, inst_address, pFile);
 			return;
 		case hop68::OpType::IMMEDIATE:
+			if (operand.imm.size == hop68::Size::LONG)
+			{
+				symbol sym;
+				if (find_symbol(symbols, operand.imm.val0, sym))
+				{
+					fprintf(pFile, "%s", sym.label.c_str());
+					return;
+				}
+			}
 			if (operand.imm.is_signed && (int32_t)operand.imm.val0 < 0)
 				fprintf(pFile, "#-$%x", -(int32_t)operand.imm.val0);
 			else
