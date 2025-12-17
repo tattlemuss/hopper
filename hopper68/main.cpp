@@ -118,15 +118,26 @@ int print(const symbols& symbols, const line_numbers& lines,
 	uint8_t prev_flag = 0;
 
 	size_t last_file_index = (size_t)-1;
+	symbols::sym_map::const_iterator sym_it = symbols.table.begin();
 	for (size_t i = 0; i < disasm.lines.size(); ++i)
 	{
 		const disassembly::line& line = disasm.lines[i];
 		const hop68::instruction& inst = line.inst;
 
 		// TODO very naive label check
-		symbol sym;
-		if (find_symbol(symbols, line.address, sym))
-			fprintf(pOutput, "%s:\n", sym.label.c_str());
+		while (sym_it != symbols.table.end())
+		{
+			if (sym_it->first >= line.inst.address + line.inst.byte_count)
+				break;
+
+			const symbol& sym = sym_it->second;
+			uint32_t sym_off = sym.address - line.address;
+			if (sym_off)
+				fprintf(pOutput, "%s: = *+%u\n", sym.label.c_str(), sym_off);
+			else
+				fprintf(pOutput, "%s:\n", sym.label.c_str());
+			++sym_it;
+		}
 
 		// Debug line-number checks
 		line_numbers::line ln;
@@ -142,11 +153,20 @@ int print(const symbols& symbols, const line_numbers& lines,
 			fprintf(pOutput, "; line %04u:\n", ln.line);
 		}
 
-		if (osettings.show_address)
-			fprintf(pOutput, "$%x\t", line.address);
-
 		fprintf(pOutput, "\t");
-		print(inst, symbols, line.address, pOutput);
+		int count = print(inst, symbols, line.address, pOutput);
+
+		// Insert tabs up to 32 characters
+		// NOTE: assumes tab size of 8
+		if (osettings.show_address)
+		{
+			while (count < 32)
+			{
+				fprintf(pOutput, "\t");
+				count = ((count + 8) / 8) * 8;
+			}
+			fprintf(pOutput, "; %x", inst.address);
+		}
 
 		if (osettings.show_timings && inst.opcode != hop68::Opcode::NONE)
 		{
