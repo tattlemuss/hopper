@@ -968,7 +968,7 @@ int Inst_alu_dreg(buffer_reader& buffer, const decode_settings& dsettings, instr
 		// Dest is d-reg
 		inst.op1.type = OpType::D_DIRECT;
 		inst.op1.d_register.reg = dreg;
-		return decode_ea(buffer, dsettings, inst.op0, ea_group::ALL, mode, reg, ea_size, inst.address);
+		return decode_ea(buffer, dsettings, inst.op0, ea_group::DATA, mode, reg, ea_size, inst.address);
 	}
 }
 
