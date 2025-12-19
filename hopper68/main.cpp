@@ -244,7 +244,7 @@ void add_reference_symbols(const disassembly& disasm, const output_settings& set
 		if (calc_relative_address(line.inst.op1, line.address, target_address))
 		{
 			symbol sym;
-			if (target_address <  !find_symbol(symbols, target_address, sym))
+			if (!find_symbol(symbols, target_address, sym))
 			{
 				sym.address = target_address;
 				sym.section = symbol::section_type::TEXT;
