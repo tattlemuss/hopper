@@ -942,7 +942,7 @@ int Inst_cas2(buffer_reader& buffer, const decode_settings& /*dsettings*/, instr
 }
 
 // ----------------------------------------------------------------------------
-int Inst_alu_dreg(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+int Inst_addsub_dreg(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
 {
 	uint8_t dreg = (header >> 9) & 7;
 	uint8_t ea_dst = (header >> 8) & 1;
@@ -968,7 +968,11 @@ int Inst_alu_dreg(buffer_reader& buffer, const decode_settings& dsettings, instr
 		// Dest is d-reg
 		inst.op1.type = OpType::D_DIRECT;
 		inst.op1.d_register.reg = dreg;
-		return decode_ea(buffer, dsettings, inst.op0, ea_group::DATA, mode, reg, ea_size, inst.address);
+		// Special case: Areg is not allowed in byte mode
+		ea_group group = ea_group::ALL;
+		if (ea_size == Size::BYTE)
+			group = ea_group::DATA;
+		return decode_ea(buffer, dsettings, inst.op0, group, mode, reg, ea_size, inst.address);
 	}
 }
 
@@ -989,6 +993,37 @@ int Inst_addsuba(buffer_reader& buffer, const decode_settings& dsettings, instru
 	inst.op1.type = OpType::A_DIRECT;
 	inst.op1.a_register.reg = areg;
 	return decode_ea(buffer, dsettings, inst.op0, ea_group::ALL, mode, reg, ea_size, inst.address);
+}
+
+// ----------------------------------------------------------------------------
+int Inst_andor_dreg(buffer_reader& buffer, const decode_settings& dsettings, instruction& inst, uint32_t header)
+{
+	uint8_t dreg = (header >> 9) & 7;
+	uint8_t ea_dst = (header >> 8) & 1;
+	uint8_t size   = (header >> 6) & 3;
+	uint8_t mode = (header >> 3) & 7;
+	uint8_t reg  = (header >> 0) & 7;
+
+	Size sizes[] = { Size::BYTE, Size::WORD, Size::LONG, Size::NONE };
+	Size ea_size = sizes[size];
+	if (ea_size == Size::NONE)
+		return 1;
+	inst.suffix = size_to_suffix(ea_size);
+
+	if (ea_dst)
+	{
+		// Src is d-reg
+		inst.op0.type = OpType::D_DIRECT;
+		inst.op0.d_register.reg = dreg;
+		return decode_ea(buffer, dsettings, inst.op1, ea_group::MEM_ALT, mode, reg, ea_size, inst.address);
+	}
+	else
+	{
+		// Dest is d-reg. No A-reg allowed
+		inst.op1.type = OpType::D_DIRECT;
+		inst.op1.d_register.reg = dreg;
+		return decode_ea(buffer, dsettings, inst.op0, ea_group::DATA, mode, reg, ea_size, inst.address);
+	}
 }
 
 // ----------------------------------------------------------------------------
@@ -2015,7 +2050,7 @@ const matcher_entry g_matcher_table_1000[] =
 	MATCH_ENTRY2_IMPL(12,4,0b1000, 3,6,0b110001,	CPU_MIN_68020, UNPK,		Inst_pack_predec ),
 	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b011,		CPU_MIN_68000, DIVU,		Inst_muldiv ),
 	MATCH_ENTRY2_IMPL(12,4,0b1000, 6,3,0b111,		CPU_MIN_68000, DIVS,		Inst_muldiv ),
-	MATCH_ENTRY1_IMPL(12,4,0b1000,					CPU_MIN_68000, OR,			Inst_alu_dreg ),
+	MATCH_ENTRY1_IMPL(12,4,0b1000,					CPU_MIN_68000, OR,			Inst_andor_dreg ),
 	MATCH_END
 };
 
@@ -2024,7 +2059,7 @@ const matcher_entry g_matcher_table_1001[] =
 	MATCH_ENTRY2_IMPL(12,4,0b1001, 6,2,0b11,		CPU_MIN_68000, SUBA,		Inst_addsuba ),
 	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,0,	CPU_MIN_68000, SUBX,		Inst_subx_reg ),
 	MATCH_ENTRY3_IMPL(12,4,0b1001, 8,1,1, 3,3,1,	CPU_MIN_68000, SUBX,		Inst_subx_predec ),
-	MATCH_ENTRY1_IMPL(12,4,0b1001,					CPU_MIN_68000, SUB,			Inst_alu_dreg ),
+	MATCH_ENTRY1_IMPL(12,4,0b1001,					CPU_MIN_68000, SUB,			Inst_addsub_dreg ),
 	MATCH_END
 };
 
@@ -2055,7 +2090,7 @@ const matcher_entry g_matcher_table_1100[] =
 	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101000,	CPU_MIN_68000, EXG,			Inst_exg_dd ),
 	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b101001,	CPU_MIN_68000, EXG,			Inst_exg_aa ),
 	MATCH_ENTRY2_IMPL(12,4,0b1100, 3,6,0b110001,	CPU_MIN_68000, EXG,			Inst_exg_da ),
-	MATCH_ENTRY1_IMPL(12,4,0b1100,					CPU_MIN_68000, AND,			Inst_alu_dreg ),
+	MATCH_ENTRY1_IMPL(12,4,0b1100,					CPU_MIN_68000, AND,			Inst_andor_dreg ),
 	MATCH_END
 };
 
@@ -2064,7 +2099,7 @@ const matcher_entry g_matcher_table_1101[] =
 	MATCH_ENTRY2_IMPL(12,4,0b1101, 6,2,0b11,		CPU_MIN_68000, ADDA,		Inst_addsuba ),	// more specific than ADDX
 	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,0,	CPU_MIN_68000, ADDX,		Inst_subx_reg ),
 	MATCH_ENTRY3_IMPL(12,4,0b1101, 8,1,1, 3,3,1,	CPU_MIN_68000, ADDX,		Inst_subx_predec ),
-	MATCH_ENTRY1_IMPL(12,4,0b1101,					CPU_MIN_68000, ADD,			Inst_alu_dreg ),
+	MATCH_ENTRY1_IMPL(12,4,0b1101,					CPU_MIN_68000, ADD,			Inst_addsub_dreg ),
 	MATCH_END
 };
 
