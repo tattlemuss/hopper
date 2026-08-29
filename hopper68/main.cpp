@@ -571,6 +571,20 @@ static int read_reloc(hop68::buffer_reader& buf, hop68::buffer_reader& text_buf,
 }
 
 // ----------------------------------------------------------------------------
+void rename_empty_labels(const output_settings& osettings,
+						symbols& symbols)
+{
+	// Rename auto-labelled symbols to be in address-order
+	uint32_t id = osettings.label_start_id;
+	for (symbols::sym_map::iterator it = symbols.table.begin();
+			it != symbols.table.end();
+			++it)
+	{
+		if (it->second.label.size() == 0)
+			it->second.label = osettings.label_prefix + std::to_string(id++);
+	}
+}
+// ----------------------------------------------------------------------------
 int process_tos_file(const uint8_t* data_ptr, long size, const hop68::decode_settings& dsettings,
 		const output_settings& osettings, FILE* pOutput)
 {
@@ -642,16 +656,7 @@ int process_tos_file(const uint8_t* data_ptr, long size, const hop68::decode_set
 	if (osettings.autolabel)
 		add_reference_symbols(disasm, osettings, exe_symbols);
 
-	// Rename auto-labelled symbols to be in address-order
-	uint32_t id = osettings.label_start_id;
-	for (symbols::sym_map::iterator it = exe_symbols.table.begin();
-			it != exe_symbols.table.end();
-			++it)
-	{
-		if (it->second.label.size() == 0)
-			it->second.label = osettings.label_prefix + std::to_string(id++);
-	}
-
+	rename_empty_labels(osettings, exe_symbols);
 	print(exe_symbols, lines, disasm, osettings, pOutput);
 	return 0;
 }
@@ -669,7 +674,7 @@ int process_bin_file(const uint8_t* data_ptr, long size, const hop68::decode_set
 		return 1;
 
 	add_reference_symbols(disasm, osettings, bin_symbols);
-
+	rename_empty_labels(osettings, bin_symbols);
 	print(bin_symbols, dummy_lines, disasm, osettings, pOutput);
 	return 0;
 }
