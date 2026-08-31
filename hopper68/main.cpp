@@ -208,7 +208,8 @@ int print(const symbols& symbols, const line_numbers& lines,
 static void add_reference_symbols(const hop68::operand& op,
 	uint32_t line_address,
 	uint32_t first_address,
-	uint32_t last_address, symbols& symbols)
+	uint32_t last_address, symbols& symbols,
+	bool has_relocs)
 {
 	uint32_t target_address;
 	if (calc_relative_address(op, line_address, target_address))
@@ -229,14 +230,21 @@ static void add_reference_symbols(const hop68::operand& op,
 	if (op.type == hop68::ABSOLUTE_LONG)
 	{
 		target_address = op.absolute_long.longaddr;
-		symbol sym;
-		if (target_address >= first_address &&
-			target_address < last_address &&
-			!find_symbol(symbols, target_address, sym))
+
+		// See if there is a reloc for the address of the operand
+		uint32_t reloc_addr = line_address + op.absolute_long.offset_in_inst;
+		uint32_t dummy_target;
+		if (!has_relocs || find_reloc(symbols, reloc_addr, dummy_target))
 		{
-			sym.address = target_address;
-			sym.section = symbol::section_type::TEXT;
-			add_symbol(symbols, sym);
+			symbol sym;
+			if (target_address >= first_address &&
+				target_address < last_address &&
+				!find_symbol(symbols, target_address, sym))
+			{
+				sym.address = target_address;
+				sym.section = symbol::section_type::TEXT;
+				add_symbol(symbols, sym);
+			}
 		}
 	}
 }
@@ -244,7 +252,8 @@ static void add_reference_symbols(const hop68::operand& op,
 // ----------------------------------------------------------------------------
 // Find addresses referenced by disasm instructions and add them to the
 // symbol table
-static void add_reference_symbols(const disassembly& disasm, symbols& symbols)
+static void add_reference_symbols(const disassembly& disasm, symbols& symbols,
+	bool has_relocs)
 {
 	if (disasm.lines.size() == 0)
 		return;
@@ -255,9 +264,9 @@ static void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 	{
 		const disassembly::line& line = disasm.lines[i];
 		add_reference_symbols(line.inst.op0, line.address, first_address,
-			last_address, symbols);
+			last_address, symbols, has_relocs);
 		add_reference_symbols(line.inst.op1, line.address, first_address,
-			last_address, symbols);
+			last_address, symbols, has_relocs);
 	}
 }
 
@@ -661,7 +670,7 @@ int process_tos_file(const uint8_t* data_ptr, long size, const hop68::decode_set
 	// Scan decoded instructions and add labels from operands
 	if (osettings.autolabel)
 	{
-		add_reference_symbols(disasm, exe_symbols);
+		add_reference_symbols(disasm, exe_symbols, true);
 		rename_empty_labels(osettings, exe_symbols);
 	}
 
@@ -682,7 +691,7 @@ int process_bin_file(const uint8_t* data_ptr, long size, const hop68::decode_set
 		return 1;
 	if (osettings.autolabel)
 	{
-		add_reference_symbols(disasm, bin_symbols);
+		add_reference_symbols(disasm, bin_symbols, false);
 		rename_empty_labels(osettings, bin_symbols);
 	}
 

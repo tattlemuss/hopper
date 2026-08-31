@@ -320,11 +320,10 @@ int print(const hop68::operand& operand, const symbols& symbols, uint32_t inst_a
 		{
 			// Special case: show long immediates as labels, if we know a reloc
 			// has taken place here.
-			// We know the reloc has to be at +2 in the instruction, since it is
-			// always a source operand for immediates.
 			uint32_t target = 0;
 			if (operand.imm.size == hop68::Size::LONG &&
-				find_reloc(symbols, inst_address + 2, target))
+				find_reloc(symbols, inst_address + operand.imm.offset_in_inst,
+					target))
 			{
 				symbol sym;
 				if (target == operand.imm.val0 &&

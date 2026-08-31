@@ -491,6 +491,8 @@ int decode_ea(buffer_reader& buffer, const decode_settings& dsettings, operand& 
 			return 0;
 
 		case OpType::ABSOLUTE_LONG:
+			// This is used to detect relocations
+			operand.absolute_long.offset_in_inst = read_address - inst_address;
 			if (buffer.read_long(val32))
 				return 1;
 			operand.absolute_long.longaddr = val32;
@@ -523,6 +525,7 @@ int decode_ea(buffer_reader& buffer, const decode_settings& dsettings, operand& 
 			return 0;
 
 		case OpType::IMMEDIATE:
+			operand.imm.offset_in_inst = read_address - inst_address;
 			return read_immediate(buffer, operand, size);
 
 		default:

@@ -288,6 +288,7 @@ struct operand
 		{
 			Size		size;		// byte, word or long
 			uint32_t	val0;
+			uint16_t	offset_in_inst;
 			bool		is_signed;
 		} imm;
 
@@ -337,6 +338,7 @@ struct operand
 		struct
 		{
 			uint32_t longaddr;
+			uint16_t offset_in_inst;
 		} absolute_long;
 
 		struct
