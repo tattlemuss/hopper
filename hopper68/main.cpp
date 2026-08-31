@@ -205,9 +205,46 @@ int print(const symbols& symbols, const line_numbers& lines,
 }
 
 // ----------------------------------------------------------------------------
+static void add_reference_symbols(const hop68::operand& op,
+	uint32_t line_address,
+	uint32_t first_address,
+	uint32_t last_address, symbols& symbols)
+{
+	uint32_t target_address;
+	if (calc_relative_address(op, line_address, target_address))
+	{
+		symbol sym;
+		if (target_address >= first_address &&
+			target_address < last_address &&
+			!find_symbol(symbols, target_address, sym))
+		{
+			sym.address = target_address;
+			sym.section = symbol::section_type::TEXT;
+			add_symbol(symbols, sym);
+		}
+	}
+
+	// TOOD: for .prg files, only do this when
+	// a relocation record is found
+	if (op.type == hop68::ABSOLUTE_LONG)
+	{
+		target_address = op.absolute_long.longaddr;
+		symbol sym;
+		if (target_address >= first_address &&
+			target_address < last_address &&
+			!find_symbol(symbols, target_address, sym))
+		{
+			sym.address = target_address;
+			sym.section = symbol::section_type::TEXT;
+			add_symbol(symbols, sym);
+		}
+	}
+}
+
+// ----------------------------------------------------------------------------
 // Find addresses referenced by disasm instructions and add them to the
 // symbol table
-void add_reference_symbols(const disassembly& disasm, symbols& symbols)
+static void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 {
 	if (disasm.lines.size() == 0)
 		return;
@@ -217,63 +254,10 @@ void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 	for (size_t i = 0; i < disasm.lines.size(); ++i)
 	{
 		const disassembly::line& line = disasm.lines[i];
-		uint32_t target_address;
-
-		if (calc_relative_address(line.inst.op0, line.address, target_address))
-		{
-			symbol sym;
-			if (target_address >= first_address &&
-				target_address < last_address &&
-				!find_symbol(symbols, target_address, sym))
-			{
-				sym.address = target_address;
-				sym.section = symbol::section_type::TEXT;
-				add_symbol(symbols, sym);
-			}
-		}
-
-		// TOOD: for .prg files, only do this when
-		// a relocation record is found
-		if (line.inst.op0.type == hop68::ABSOLUTE_LONG)
-		{
-			target_address = line.inst.op0.absolute_long.longaddr;
-			symbol sym;
-			if (target_address >= first_address &&
-				target_address < last_address &&
-				!find_symbol(symbols, target_address, sym))
-			{
-				sym.address = target_address;
-				sym.section = symbol::section_type::TEXT;
-				add_symbol(symbols, sym);
-			}
-		}
-
-		if (line.inst.op1.type == hop68::ABSOLUTE_LONG)
-		{
-			target_address = line.inst.op1.absolute_long.longaddr;
-			symbol sym;
-			if (target_address >= first_address &&
-				target_address < last_address &&
-				!find_symbol(symbols, target_address, sym))
-			{
-				sym.address = target_address;
-				sym.section = symbol::section_type::TEXT;
-				add_symbol(symbols, sym);
-			}
-		}		
-
-		if (calc_relative_address(line.inst.op1, line.address, target_address))
-		{
-			symbol sym;
-			if (target_address >= first_address &&
-				target_address < last_address &&
-				!find_symbol(symbols, target_address, sym))
-			{
-				sym.address = target_address;
-				sym.section = symbol::section_type::TEXT;
-				add_symbol(symbols, sym);
-			}
-		}
+		add_reference_symbols(line.inst.op0, line.address, first_address,
+			last_address, symbols);
+		add_reference_symbols(line.inst.op1, line.address, first_address,
+			last_address, symbols);
 	}
 }
 
