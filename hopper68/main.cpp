@@ -207,7 +207,7 @@ int print(const symbols& symbols, const line_numbers& lines,
 // ----------------------------------------------------------------------------
 // Find addresses referenced by disasm instructions and add them to the
 // symbol table
-void add_reference_symbols(const disassembly& disasm, const output_settings& settings, symbols& symbols)
+void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 {
 	if (disasm.lines.size() == 0)
 		return;
@@ -238,6 +238,7 @@ void add_reference_symbols(const disassembly& disasm, const output_settings& set
 		{
 			target_address = line.inst.op0.absolute_long.longaddr;
 			symbol sym;
+			printf("Target %x\n", target_address);
 			if (target_address >= first_address &&
 				target_address < last_address &&
 				!find_symbol(symbols, target_address, sym))
@@ -247,6 +248,21 @@ void add_reference_symbols(const disassembly& disasm, const output_settings& set
 				add_symbol(symbols, sym);
 			}
 		}
+
+		if (line.inst.op1.type == hop68::ABSOLUTE_LONG)
+		{
+			target_address = line.inst.op1.absolute_long.longaddr;
+			symbol sym;
+			printf("Target %x\n", target_address);
+			if (target_address >= first_address &&
+				target_address < last_address &&
+				!find_symbol(symbols, target_address, sym))
+			{
+				sym.address = target_address;
+				sym.section = symbol::section_type::TEXT;
+				add_symbol(symbols, sym);
+			}
+		}		
 
 		if (calc_relative_address(line.inst.op1, line.address, target_address))
 		{
@@ -663,7 +679,7 @@ int process_tos_file(const uint8_t* data_ptr, long size, const hop68::decode_set
 	// Scan decoded instructions and add labels from operands
 	if (osettings.autolabel)
 	{
-		add_reference_symbols(disasm, osettings, exe_symbols);
+		add_reference_symbols(disasm, exe_symbols);
 		rename_empty_labels(osettings, exe_symbols);
 	}
 
@@ -684,7 +700,7 @@ int process_bin_file(const uint8_t* data_ptr, long size, const hop68::decode_set
 		return 1;
 	if (osettings.autolabel)
 	{
-		add_reference_symbols(disasm, osettings, bin_symbols);
+		add_reference_symbols(disasm, bin_symbols);
 		rename_empty_labels(osettings, bin_symbols);
 	}
 
