@@ -238,7 +238,6 @@ void add_reference_symbols(const disassembly& disasm, symbols& symbols)
 		{
 			target_address = line.inst.op0.absolute_long.longaddr;
 			symbol sym;
-			printf("Target %x\n", target_address);
 			if (target_address >= first_address &&
 				target_address < last_address &&
 				!find_symbol(symbols, target_address, sym))
