@@ -22,6 +22,7 @@ struct output_settings
 	bool autolabel;				// autolabelling on/off
 	std::string label_prefix;	// prefix for all auto-labels, normally "L"
 	uint32_t label_start_id;	// starting number of label prefix, normally 0
+	uint32_t org_address;		// base address for binary files
 };
 
 // ----------------------------------------------------------------------------
@@ -674,7 +675,7 @@ int process_tos_file(const uint8_t* data_ptr, long size, const hop68::decode_set
 int process_bin_file(const uint8_t* data_ptr, long size, const hop68::decode_settings& dsettings,
 		const output_settings& osettings, FILE* pOutput)
 {
-	hop68::buffer_reader buf(data_ptr, size, 0x1000);
+	hop68::buffer_reader buf(data_ptr, size, osettings.org_address);
 	symbols bin_symbols;
 	line_numbers dummy_lines;
 
@@ -710,6 +711,29 @@ static bool get_hex_value(char c, uint8_t& val)
 		return true;
 	}
 	return false;
+}
+
+// ----------------------------------------------------------------------------
+static bool get_hex_u32(const char* str, uint32_t& val)
+{
+	// Special case: skip leading '$'
+	if (*str == '$')
+		++str;
+	val = 0;
+	int count = 0;
+	while (*str != 0)
+	{
+		uint8_t currNybble = 0;
+		if (!get_hex_value(*str, currNybble))
+			return false;
+		if (++count > 8)
+			return false;	// too many chars
+
+		val <<= 4;
+		val |= currNybble;
+		++str;
+	}
+	return true;
 }
 
 // ----------------------------------------------------------------------------
@@ -798,6 +822,7 @@ void usage()
 		"\t--m68030    Select CPU type (default m68000)\n"
 		"\t--label-prefix <string>   Set prefix for auto-labels\n"
 		"\t--label-start <int>       Set starting suffix number for auto-labels\n"
+		"\t--org <hexint>            Set base PC for --bin (do not add hex prefixes) e.g --org 28fc \n"
 	);
 }
 
@@ -819,6 +844,7 @@ int main(int argc, char** argv)
 	osettings.autolabel = true;
 	osettings.label_prefix = "L";
 	osettings.label_start_id = 0;
+	osettings.org_address = 0x1000;
 
 	hop68::decode_settings dsettings = {};
 	dsettings.cpu_type = hop68::CPU_TYPE_68000;
@@ -865,6 +891,24 @@ int main(int argc, char** argv)
 			else
 			{
 				fprintf(stderr, "Error: --label-start misses parameter\n");
+				return 1;
+			}
+		}
+		else if (strcmp(argv[opt], "--org") == 0)
+		{
+			opt++;
+			if (opt < last_arg)
+			{
+				const char* hex_string = argv[opt];
+				if (!get_hex_u32(hex_string, osettings.org_address))
+				{
+					fprintf(stderr, "Error: --org can't parse hex value %s\n", hex_string);
+					return 1;
+				}
+			}
+			else
+			{
+				fprintf(stderr, "Error: --org misses parameter\n");
 				return 1;
 			}
 		}
