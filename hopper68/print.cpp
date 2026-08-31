@@ -72,6 +72,55 @@ static int print_bitfield(const hop68::bitfield& bf, FILE* pFile)
 }
 
 // ----------------------------------------------------------------------------
+static int print_movem_mask(uint16_t reg_mask, FILE* pFile)
+{
+	int count = 0;
+    int num_ranges = 0;
+    for (int regtype = 0; regtype < 2; ++regtype)   // D or A
+    {
+        char regname = regtype == 0 ? 'd' : 'a';
+
+        // Select the 8 bits we care about
+        uint16_t mask = ((reg_mask) >> (8 * regtype)) & 0xff;
+        mask <<= 1; // shift up so that "-1" is a 0
+
+        // an example mask for d0/d3-d7 is now:
+        // reg: x76543210x   (x must be 0)
+        // val: 0111110010
+
+        // NOTE: 9 bits to simulate "d8" being 0 so
+        // that a sequence ending in d7 can finish
+        int lastStart = -1;
+        for (int bitIdx = 0; bitIdx <= 8; ++bitIdx)
+        {
+            // Check for transitions by looking at each pair of bits in turn
+            // Our "test" bit corresponding to bitIdx is the higher bit here
+            uint16_t twoBits = (mask >> bitIdx) & 3;
+            if (twoBits == 1)   // "%01"
+            {
+                // Last bit on, our new bit off, add a range
+                // up to the previous bit ID (bitIdx - 1).
+                // Add separator when required
+                if (num_ranges != 0)
+                    count += fprintf(pFile, "/");
+
+                if (lastStart == bitIdx - 1)
+                    count += fprintf(pFile, "%c%u", regname, lastStart);    // single register
+                else
+                    count += fprintf(pFile, "%c%u-%c%u", regname, lastStart, regname, (bitIdx - 1));  // range
+                ++num_ranges;
+            }
+            else if (twoBits == 2) // "%10"
+            {
+                // last bit off, new bit on, so this is start of a run from "bitIdx"
+                lastStart = bitIdx;
+            }
+        }
+    }
+	return count;
+}
+
+// ----------------------------------------------------------------------------
 enum LastOutput
 {
 	kNone,			// start token
@@ -246,16 +295,7 @@ int print(const hop68::operand& operand, const symbols& symbols, uint32_t inst_a
 		}
 		case hop68::OpType::MOVEM_REG:
 		{
-			bool first = true;
-			for (int i = 0; i < 16; ++i)
-				if (operand.movem_reg.reg_mask & (1 << i))
-				{
-					if (!first)
-						count += fprintf(pFile, "/");
-					count += fprintf(pFile, "%s", hop68::get_movem_reg_string(i));
-					first = false;
-				}
-			return count;
+			return print_movem_mask(operand.movem_reg.reg_mask, pFile);
 		}
 		case hop68::OpType::RELATIVE_BRANCH:
 		{
