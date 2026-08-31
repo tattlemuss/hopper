@@ -92,7 +92,7 @@ int decode_buf(hop68::buffer_reader& buf, const hop68::decode_settings& dsetting
 	while (buf.get_remain() >= 2)
 	{
 		disassembly::line line;
-		line.address = buf.get_pos();
+		line.address = buf.get_address();
 
 		// decode uses a copy of the buffer state
 		hop68::buffer_reader buf_copy(buf);
@@ -208,8 +208,10 @@ int print(const symbols& symbols, const line_numbers& lines,
 // symbol table
 void add_reference_symbols(const disassembly& disasm, const output_settings& settings, symbols& symbols)
 {
-	uint32_t label_id = settings.label_start_id;
-	uint32_t last_address = disasm.lines.back().address;
+	if (disasm.lines.size() == 0)
+		return;
+	uint32_t first_address = disasm.lines.front().address;
+	uint32_t last_address = disasm.lines.back().address + disasm.lines.back().inst.byte_count;
 
 	for (size_t i = 0; i < disasm.lines.size(); ++i)
 	{
@@ -219,37 +221,42 @@ void add_reference_symbols(const disassembly& disasm, const output_settings& set
 		if (calc_relative_address(line.inst.op0, line.address, target_address))
 		{
 			symbol sym;
-			if (!find_symbol(symbols, target_address, sym))
+			if (target_address >= first_address &&
+				target_address < last_address &&
+				!find_symbol(symbols, target_address, sym))
 			{
 				sym.address = target_address;
 				sym.section = symbol::section_type::TEXT;
 				add_symbol(symbols, sym);
-				++label_id;
 			}
 		}
 
+		// TOOD: for .prg files, only do this when
+		// a relocation record is found
 		if (line.inst.op0.type == hop68::ABSOLUTE_LONG)
 		{
 			target_address = line.inst.op0.absolute_long.longaddr;
 			symbol sym;
-			if (target_address <= last_address && !find_symbol(symbols, target_address, sym))
+			if (target_address >= first_address &&
+				target_address < last_address &&
+				!find_symbol(symbols, target_address, sym))
 			{
 				sym.address = target_address;
 				sym.section = symbol::section_type::TEXT;
 				add_symbol(symbols, sym);
-				++label_id;
 			}
 		}
 
 		if (calc_relative_address(line.inst.op1, line.address, target_address))
 		{
 			symbol sym;
-			if (!find_symbol(symbols, target_address, sym))
+			if (target_address >= first_address &&
+				target_address < last_address &&
+				!find_symbol(symbols, target_address, sym))
 			{
 				sym.address = target_address;
 				sym.section = symbol::section_type::TEXT;
 				add_symbol(symbols, sym);
-				++label_id;
 			}
 		}
 	}
@@ -654,9 +661,11 @@ int process_tos_file(const uint8_t* data_ptr, long size, const hop68::decode_set
 
 	// Scan decoded instructions and add labels from operands
 	if (osettings.autolabel)
+	{
 		add_reference_symbols(disasm, osettings, exe_symbols);
+		rename_empty_labels(osettings, exe_symbols);
+	}
 
-	rename_empty_labels(osettings, exe_symbols);
 	print(exe_symbols, lines, disasm, osettings, pOutput);
 	return 0;
 }
@@ -665,16 +674,19 @@ int process_tos_file(const uint8_t* data_ptr, long size, const hop68::decode_set
 int process_bin_file(const uint8_t* data_ptr, long size, const hop68::decode_settings& dsettings,
 		const output_settings& osettings, FILE* pOutput)
 {
-	hop68::buffer_reader buf(data_ptr, size, 0);
+	hop68::buffer_reader buf(data_ptr, size, 0x1000);
 	symbols bin_symbols;
 	line_numbers dummy_lines;
 
 	disassembly disasm;
 	if (decode_buf(buf, dsettings, disasm))
 		return 1;
+	if (osettings.autolabel)
+	{
+		add_reference_symbols(disasm, osettings, bin_symbols);
+		rename_empty_labels(osettings, bin_symbols);
+	}
 
-	add_reference_symbols(disasm, osettings, bin_symbols);
-	rename_empty_labels(osettings, bin_symbols);
 	print(bin_symbols, dummy_lines, disasm, osettings, pOutput);
 	return 0;
 }
